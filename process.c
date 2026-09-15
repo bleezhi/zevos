@@ -7,7 +7,6 @@
 #define PROCESS_READY 1
 #define PROCESS_RUNNING 2
 #define PROCESS_BLOCKED 3
-#define PROCESS_KERNEL_STACK_SIZE 4096
 
 struct process {
     uint32_t pid;
@@ -24,15 +23,15 @@ static struct process processes[PROCESS_MAX];
 static uint32_t next_pid = 1;
 static uint32_t current_index;
 
-extern void *kmalloc(uint64_t size);
 extern void process_switch(uint64_t *old_rsp, uint64_t new_rsp);
 
 static unsigned int next_ready(unsigned int start)
 {
     for (unsigned int n = 1; n <= PROCESS_MAX; ++n) {
         unsigned int i = (start + n) % PROCESS_MAX;
-        if (processes[i].state == PROCESS_READY ||
-            processes[i].state == PROCESS_RUNNING)
+        if ((processes[i].state == PROCESS_READY ||
+             processes[i].state == PROCESS_RUNNING) &&
+            processes[i].kernel_rsp != 0)
             return i;
     }
     return start;
@@ -72,14 +71,12 @@ void process_destroy(struct process *process)
 {
     if (!process || process == &processes[0])
         return;
-    if (process->kernel_stack)
-        return; /* Stack reclamation will be handled by the VM layer. */
     process->state = PROCESS_UNUSED;
     process->pid = 0;
 }
 
-/* Cooperative scheduler entry point. Timer-driven preemption will use the
- * same selection logic once interrupt-frame switching is enabled. */
+/* Select the next runnable process. A process with no prepared kernel stack
+ * is left alone until the process/ELF layer supplies one. */
 void scheduler_tick(void)
 {
     unsigned int old = current_index;
@@ -91,7 +88,6 @@ void scheduler_tick(void)
     processes[old].state = PROCESS_READY;
     processes[next].state = PROCESS_RUNNING;
     current_index = next;
-
     process_switch(&processes[old].kernel_rsp, processes[next].kernel_rsp);
 }
 
