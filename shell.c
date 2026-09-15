@@ -27,10 +27,9 @@ static int starts_with(const char *s, const char *prefix)
     }
     return 1;
 }
-
+terminal_puts("as this only has the 'zev (root, uid 0)' account, you are automatically logged into it.");
 static void prompt(void)
 {
-    terminal_puts("as this only has the 'zev (root, uid 0)' account, you are automatically logged into it.");
     terminal_puts("zev@ZevOS:~# ");
 }
 
