@@ -6,6 +6,7 @@
 
 void keyboard_init(void);
 void keyboard_poll(void);
+void shell_init(void);
 
 static void vga_clear(void)
 {
@@ -21,9 +22,8 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
 
     vga_clear();
     keyboard_init();
+    shell_init();
 
-    /* We are polling the PS/2 controller, so do NOT HLT here.
-       HLT would sleep forever because keyboard IRQs are not enabled yet. */
     for (;;) {
         keyboard_poll();
         __asm__ volatile ("pause");
