@@ -35,6 +35,7 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
     terminal_puts("process: scheduler foundation ready\n");
     terminal_puts("process: context-switch foundation ready\n");
     terminal_puts("usermode: ring 3 transition foundation ready\n");
+    terminal_puts("tss: ring 3 interrupt stack foundation ready\n");
 
     idt_init();
     terminal_puts("interrupts: IDT/PIC/PIT ready\n");
