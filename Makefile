@@ -7,6 +7,8 @@ RESCUE  := grub-mkrescue
 CFLAGS  := -ffreestanding -fno-stack-protector -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mcmodel=small -O2 -Wall -Wextra
 LDFLAGS := -T linker.ld -nostdlib -z max-page-size=0x1000
 
+OBJS := boot.o interrupts.o kernel.o terminal.o keyboard.o shell.o pmm.o heap.o process.o zinit.o
+
 .PHONY: all clean check iso
 
 all: os.iso
@@ -14,17 +16,14 @@ all: os.iso
 boot.o: boot.asm
 	$(AS) -f elf64 $< -o $@
 
-kernel.o: kernel.c
+interrupts.o: interrupts.asm
+	$(AS) -f elf64 $< -o $@
+
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-keyboard.o: keyboard.c
-	$(CC) $(CFLAGS) -c keyboard.c -o keyboard.o
-
-shell.o: shell.c
-	$(CC) $(CFLAGS) -c shell.c -o shell.o
-
-kernel.elf: boot.o kernel.o keyboard.o shell.o linker.ld
-	$(LD) $(LDFLAGS) -o $@ boot.o kernel.o keyboard.o shell.o
+kernel.elf: $(OBJS) linker.ld
+	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
 check: kernel.elf
 	$(GRUB) --is-x86-multiboot2 kernel.elf
