@@ -18,7 +18,7 @@ syscall_entry:
 
     mov rdi, rax
     call syscall_dispatch
-    push rax
+    mov r10, rax
 
     pop r15
     pop r14
@@ -26,7 +26,7 @@ syscall_entry:
     pop r12
     pop rbx
     pop rbp
-    pop rax
+    mov rax, r10
     iretq
 
 section .note.GNU-stack noalloc noexec nowrite progbits
