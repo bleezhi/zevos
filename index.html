@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ZevOS — A tiny x86_64 operating system</title>
+  <meta name="description" content="ZevOS is a tiny x86_64 hobby operating system built from scratch with C and NASM assembly.">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top"><img src="logo.svg" alt="ZevOS logo"><span>ZevOS</span></a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#status">Status</a>
+      <a href="https://github.com/bleezhi/zevos">GitHub</a>
+      <a class="nav-button" href="https://github.com/bleezhi/zevos/releases">Releases</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">x86_64 · C · NASM · OPEN SOURCE</div>
+        <h1>A tiny OS.<br><span>Built from scratch.</span></h1>
+        <p>ZevOS is a hobby operating system exploring boot, memory, interrupts, processes, and eventually a real userspace — one subsystem at a time.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/bleezhi/zevos/releases">Download ZevOS</a>
+          <a class="button secondary" href="https://github.com/bleezhi/zevos">View source</a>
+        </div>
+      </div>
+      <div class="terminal-card" aria-label="ZevOS terminal preview">
+        <div class="terminal-top"><i></i><i></i><i></i><span>zev@ZevOS</span></div>
+        <pre><code>ZevOS v0.1
+Welcome to the ZevOS shell.
+As this only has the 'zev (root, uid 0)' account,
+you are automatically logged into it.
+
+<span>zev@ZevOS:~#</span> help
+Commands:
+  help       Show this help
+  clear      Clear the screen
+  echo TEXT  Print TEXT
+  about      About ZevOS
+  ver        Show version</code></pre>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading"><span>01</span><h2>What is ZevOS?</h2></div>
+      <div class="cards">
+        <article><b>⚡ x86_64</b><p>GRUB Multiboot2 boot and a transition into 64-bit long mode.</p></article>
+        <article><b>🧠 Kernel foundations</b><p>Physical memory management, a kernel heap, interrupts, PIT timing and keyboard input.</p></article>
+        <article><b>⚙ zinit</b><p>A service-manager foundation designed to become the system's PID 1 as userspace arrives.</p></article>
+      </div>
+    </section>
+
+    <section id="status" class="section split">
+      <div>
+        <div class="section-heading"><span>02</span><h2>Project status</h2></div>
+        <p>ZevOS is actively being developed. It is a learning project, so things can absolutely break — especially in nightly builds.</p>
+      </div>
+      <div class="status-box">
+        <div><span class="dot"></span><strong>Nightly</strong><small>Bleeding edge</small></div>
+        <div><span class="dot"></span><strong>Stable</strong><small>Not released yet</small></div>
+      </div>
+    </section>
+
+    <section class="warning">
+      <strong>⚠ Nightly warning</strong>
+      <p>Nightly ISOs are development builds and may be unstable, incomplete, or broken. If you're a normal user, don't use a nightly build.</p>
+      <a href="https://github.com/bleezhi/zevos/releases">See nightly releases →</a>
+    </section>
+  </main>
+
+  <footer><img src="logo.svg" alt=""><span>ZevOS</span><span class="muted">A tiny x86_64 hobby OS.</span><a href="https://github.com/bleezhi/zevos">GitHub</a></footer>
+</body>
+</html>
