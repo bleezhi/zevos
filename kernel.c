@@ -8,6 +8,7 @@ void shell_init(void);
 void pmm_init(unsigned int multiboot_info);
 void process_init(void);
 void zinit_init(void);
+void vmm_init(void);
 
 void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
 {
@@ -30,6 +31,9 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
 
     pmm_init(multiboot_info);
     terminal_puts("memory: physical page allocator ready\n");
+
+    vmm_init();
+    terminal_puts("memory: virtual memory foundation ready\n");
 
     process_init();
     terminal_puts("process: scheduler foundation ready\n");
