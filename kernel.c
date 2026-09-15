@@ -4,11 +4,14 @@
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 
+void keyboard_init(void);
+void keyboard_poll(void);
+
 static void vga_clear(void)
 {
     volatile unsigned short *vga = VGA_MEMORY;
     for (unsigned int i = 0; i < VGA_WIDTH * VGA_HEIGHT; ++i)
-        vga[i] = 0x0F20; /* white on black, space */
+        vga[i] = 0x0F20;
 }
 
 void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
@@ -17,13 +20,10 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
     (void)multiboot_info;
 
     vga_clear();
+    keyboard_init();
 
-    const char *message = "ZevOS booted successfully!";
-    volatile unsigned short *vga = VGA_MEMORY;
-
-    for (unsigned int i = 0; message[i] != '\0'; ++i)
-        vga[i] = (unsigned short)message[i] | 0x0F00;
-
-    for (;;)
+    for (;;) {
+        keyboard_poll();
         __asm__ volatile ("hlt");
+    }
 }
