@@ -14,14 +14,17 @@ all: os.iso
 boot.o: boot.asm
 	$(AS) -f elf64 $< -o $@
 
-kernel.o: kernel.c keyboard.o
+kernel.o: kernel.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 keyboard.o: keyboard.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c keyboard.c -o keyboard.o
 
-kernel.elf: boot.o kernel.o keyboard.o linker.ld
-	$(LD) $(LDFLAGS) -o $@ boot.o kernel.o keyboard.o
+shell.o: shell.c
+	$(CC) $(CFLAGS) -c shell.c -o shell.o
+
+kernel.elf: boot.o kernel.o keyboard.o shell.o linker.ld
+	$(LD) $(LDFLAGS) -o $@ boot.o kernel.o keyboard.o shell.o
 
 check: kernel.elf
 	$(GRUB) --is-x86-multiboot2 kernel.elf
