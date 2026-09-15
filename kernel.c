@@ -1,31 +1,40 @@
 /* ZevOS kernel - freestanding C */
 
-#define VGA_MEMORY ((volatile unsigned short *)0xB8000)
-#define VGA_WIDTH 80
-#define VGA_HEIGHT 25
-
+void terminal_init(void);
+void terminal_puts(const char *s);
+void idt_init(void);
 void keyboard_init(void);
-void keyboard_poll(void);
 void shell_init(void);
-
-static void vga_clear(void)
-{
-    volatile unsigned short *vga = VGA_MEMORY;
-    for (unsigned int i = 0; i < VGA_WIDTH * VGA_HEIGHT; ++i)
-        vga[i] = 0x0F20;
-}
+void pmm_init(unsigned int multiboot_info);
+void process_init(void);
+void zinit_init(void);
 
 void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
 {
-    (void)multiboot_magic;
-    (void)multiboot_info;
+    terminal_init();
+    terminal_puts("ZevOS kernel starting...\n");
 
-    vga_clear();
+    if (multiboot_magic != 0x36D76289) {
+        terminal_puts("WARNING: invalid Multiboot2 magic\n");
+    }
+
+    pmm_init(multiboot_info);
+    terminal_puts("memory: physical page allocator ready\n");
+
+    process_init();
+    terminal_puts("process: scheduler foundation ready\n");
+
+    idt_init();
+    terminal_puts("interrupts: IDT/PIC/PIT ready\n");
+
     keyboard_init();
     shell_init();
+    zinit_init();
 
+    terminal_puts("ZevOS: kernel foundation ready\n");
+
+    __asm__ volatile ("sti");
     for (;;) {
-        keyboard_poll();
-        __asm__ volatile ("pause");
+        __asm__ volatile ("hlt");
     }
 }
