@@ -47,6 +47,7 @@ void zinit_init(void)
     zinit_start(1);
 
     terminal_puts("zinit: services ready\n");
+    terminal_puts("zinit: done starting fully!\n");
 }
 
 unsigned int zinit_service_count(void)
