@@ -44,12 +44,12 @@ _start:
     xor ecx, ecx
 .fill_pd:
     mov eax, ecx
-    shl eax, 21               ; physical address = index * 2 MiB
+    shl eax, 21
     or eax, 0x83              ; present | writable | huge (2 MiB)
     mov [page_table_l2 + ecx * 8], eax
     mov dword [page_table_l2 + ecx * 8 + 4], 0
     inc ecx
-    cmp ecx, 512              ; 512 * 2 MiB = 1 GiB
+    cmp ecx, 512
     jne .fill_pd
 
     ; Enable PAE.
@@ -116,3 +116,6 @@ stack_top:
 align 4
 multiboot_magic: resd 1
 multiboot_info:  resd 1
+
+; Tell modern linkers this object does not require an executable stack.
+section .note.GNU-stack noalloc noexec nowrite progbits
