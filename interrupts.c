@@ -32,6 +32,7 @@ static uint64_t ticks;
 void terminal_puts(const char *s);
 void terminal_putchar(char c);
 void keyboard_irq(void);
+void scheduler_tick(void);
 
 #define DECL_ISR(n) extern void isr##n(void)
 #define DECL_IRQ(n) extern void irq##n(void)
@@ -123,10 +124,12 @@ void exception_handler(uint64_t *stack)
 void irq_handler(uint64_t *stack)
 {
     uint64_t vector = stack[15];
-    if (vector == 32)
+    if (vector == 32) {
         ++ticks;
-    else if (vector == 33)
+        scheduler_tick();
+    } else if (vector == 33) {
         keyboard_irq();
+    }
 
     if (vector >= 40)
         outb(PIC2_COMMAND, PIC_EOI);
