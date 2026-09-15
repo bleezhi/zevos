@@ -1,4 +1,4 @@
-/* ZevOS IDT, PIC, timer, and IRQ dispatch */
+/* ZevOS IDT, PIC, timer, IRQ dispatch, and syscall gate */
 
 #include <stdint.h>
 
@@ -33,6 +33,7 @@ void terminal_puts(const char *s);
 void terminal_putchar(char c);
 void keyboard_irq(void);
 void scheduler_tick(void);
+extern void syscall_entry(void);
 
 #define DECL_ISR(n) extern void isr##n(void)
 #define DECL_IRQ(n) extern void irq##n(void)
@@ -48,13 +49,13 @@ static inline void outb(uint16_t port, uint8_t value)
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
 
-static void idt_set_gate(unsigned int n, void (*handler)(void))
+static void idt_set_gate(unsigned int n, void (*handler)(void), uint8_t type_attr)
 {
     uint64_t address = (uint64_t)handler;
     idt[n].offset_low = address & 0xFFFF;
     idt[n].selector = 0x08;
     idt[n].ist = 0;
-    idt[n].type_attr = 0x8E;
+    idt[n].type_attr = type_attr;
     idt[n].offset_mid = (address >> 16) & 0xFFFF;
     idt[n].offset_high = (address >> 32) & 0xFFFFFFFF;
     idt[n].zero = 0;
@@ -102,8 +103,11 @@ void idt_init(void)
         irq0,irq1,irq2,irq3,irq4,irq5,irq6,irq7,irq8,irq9,irq10,irq11,irq12,irq13,irq14,irq15
     };
 
-    for (unsigned int i = 0; i < 32; ++i) idt_set_gate(i, exceptions[i]);
-    for (unsigned int i = 0; i < 16; ++i) idt_set_gate(32 + i, irqs[i]);
+    for (unsigned int i = 0; i < 32; ++i) idt_set_gate(i, exceptions[i], 0x8E);
+    for (unsigned int i = 0; i < 16; ++i) idt_set_gate(32 + i, irqs[i], 0x8E);
+
+    /* DPL=3: callable by future ring-3 programs through int 0x80. */
+    idt_set_gate(0x80, syscall_entry, 0xEE);
 
     struct idt_ptr idtr = { sizeof(idt) - 1, (uint64_t)idt };
     __asm__ volatile ("lidt %0" : : "m"(idtr));
