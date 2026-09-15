@@ -30,7 +30,7 @@ static int starts_with(const char *s, const char *prefix)
 
 static void prompt(void)
 {
-    terminal_puts("evilbleez@ZevOS:~$ ");
+    terminal_puts("ZevOS:~$ ");
 }
 
 static void execute_command(void)
@@ -57,14 +57,14 @@ static void execute_command(void)
         terminal_puts("Built from scratch with C + Assembly.\n");
         prompt();
     } else if (string_equals(command, "ver")) {
-        terminal_puts("ZevOS v0.1 (evilbleez build)\n");
+        terminal_puts("ZevOS v0.1\n");
         prompt();
     } else if (starts_with(command, "echo ")) {
         terminal_puts(command + 5);
         terminal_putchar('\n');
         prompt();
     } else {
-        terminal_puts("evilbleez: command not found: ");
+        terminal_puts("command not found: ");
         terminal_puts(command);
         terminal_putchar('\n');
         prompt();
@@ -77,7 +77,7 @@ void shell_init(void)
 {
     command_length = 0;
     terminal_puts("ZevOS v0.1\n");
-    terminal_puts("Welcome to the evilbleez shell.\n");
+    terminal_puts("Welcome to the ZevOS shell.\n");
     terminal_puts("Type 'help' for commands.\n\n");
     prompt();
 }
