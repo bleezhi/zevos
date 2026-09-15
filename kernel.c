@@ -12,6 +12,16 @@ void zinit_init(void);
 void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
 {
     terminal_init();
+
+    terminal_puts("========================================\n");
+    terminal_puts("          ZevOS NIGHTLY BUILD\n");
+    terminal_puts("========================================\n");
+    terminal_puts("WARNING: This is a development build.\n");
+    terminal_puts("It may be unstable, incomplete, or broken.\n");
+    terminal_puts("If you are a normal user, you should NOT use this build.\n");
+    terminal_puts("Use a stable ZevOS release instead.\n");
+    terminal_puts("========================================\n\n");
+
     terminal_puts("ZevOS kernel starting...\n");
 
     if (multiboot_magic != 0x36D76289) {
