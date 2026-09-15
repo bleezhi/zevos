@@ -29,6 +29,10 @@ struct idt_ptr {
 static struct idt_entry idt[IDT_ENTRIES];
 static uint64_t ticks;
 
+void terminal_puts(const char *s);
+void terminal_putchar(char c);
+void keyboard_irq(void);
+
 #define DECL_ISR(n) extern void isr##n(void)
 #define DECL_IRQ(n) extern void irq##n(void)
 DECL_ISR(0); DECL_ISR(1); DECL_ISR(2); DECL_ISR(3); DECL_ISR(4); DECL_ISR(5); DECL_ISR(6); DECL_ISR(7);
@@ -41,13 +45,6 @@ DECL_IRQ(8); DECL_IRQ(9); DECL_IRQ(10); DECL_IRQ(11); DECL_IRQ(12); DECL_IRQ(13)
 static inline void outb(uint16_t port, uint8_t value)
 {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline uint8_t inb(uint16_t port)
-{
-    uint8_t value;
-    __asm__ volatile ("inb %1, %0" : "=a"(value) : "Nd"(port));
-    return value;
 }
 
 static void idt_set_gate(unsigned int n, void (*handler)(void))
@@ -64,9 +61,6 @@ static void idt_set_gate(unsigned int n, void (*handler)(void))
 
 static void pic_remap(void)
 {
-    uint8_t a1 = inb(PIC1_DATA);
-    uint8_t a2 = inb(PIC2_DATA);
-
     outb(PIC1_COMMAND, 0x11);
     outb(PIC2_COMMAND, 0x11);
     outb(PIC1_DATA, 0x20);
@@ -75,16 +69,12 @@ static void pic_remap(void)
     outb(PIC2_DATA, 0x02);
     outb(PIC1_DATA, 0x01);
     outb(PIC2_DATA, 0x01);
-
-    /* Start with timer + keyboard enabled; mask everything else. */
-    outb(PIC1_DATA, (uint8_t)(a1 | 0xFC));
-    outb(PIC2_DATA, (uint8_t)(a2 | 0xFF));
-    outb(PIC1_DATA, inb(PIC1_DATA) & (uint8_t)~0x03);
+    outb(PIC1_DATA, 0xFC);
+    outb(PIC2_DATA, 0xFF);
 }
 
 static void pit_init(void)
 {
-    /* PIT channel 0, square-wave mode, ~100 Hz. */
     uint16_t divisor = 1193182 / 100;
     outb(PIT_COMMAND, 0x36);
     outb(PIT_CHANNEL0, divisor & 0xFF);
@@ -116,7 +106,6 @@ void idt_init(void)
 
     struct idt_ptr idtr = { sizeof(idt) - 1, (uint64_t)idt };
     __asm__ volatile ("lidt %0" : : "m"(idtr));
-
     pic_remap();
     pit_init();
 }
@@ -124,15 +113,12 @@ void idt_init(void)
 void exception_handler(uint64_t *stack)
 {
     uint64_t vector = stack[15];
-    terminal_puts("\nKERNEL EXCEPTION: ");
-    terminal_puts("vector ");
+    terminal_puts("\nKERNEL EXCEPTION: vector ");
     terminal_putchar('0' + (char)(vector % 10));
     terminal_puts("\nSystem halted.\n");
     __asm__ volatile ("cli");
     for (;;) __asm__ volatile ("hlt");
 }
-
-extern void keyboard_irq(void);
 
 void irq_handler(uint64_t *stack)
 {
