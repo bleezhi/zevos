@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">ZevOS concept logo</title>
+  <desc id="desc">An angular Z-shaped mark built from terminal-like blocks.</desc>
+  <rect width="160" height="160" rx="32" fill="#10121a"/>
+  <path d="M38 42h84v20H70l-32 36v20h84v-20H70l32-36V42H38z" fill="#f5f7ff"/>
+  <path d="M70 62h32L70 98H38z" fill="#8b5cf6"/>
+  <path d="M102 62v36H70z" fill="#22d3ee" opacity=".9"/>
+  <path d="M38 118h84" stroke="#f5f7ff" stroke-width="4" stroke-linecap="square" opacity=".3"/>
+</svg>
