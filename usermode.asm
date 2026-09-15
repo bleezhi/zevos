@@ -5,8 +5,9 @@ section .text
 global user_enter
 
 ; void user_enter(entry, stack, user_cs, user_ss)
+; RDI=entry, RSI=stack, RDX=user_cs, RCX=user_ss
 user_enter:
-    mov ax, dx
+    mov ax, cx
     mov ds, ax
     mov es, ax
 
