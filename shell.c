@@ -27,7 +27,7 @@ static int starts_with(const char *s, const char *prefix)
     }
     return 1;
 }
-terminal_puts("as this only has the 'zev (root, uid 0)' account, you are automatically logged into it.");
+
 static void prompt(void)
 {
     terminal_puts("zev@ZevOS:~# ");
@@ -78,6 +78,7 @@ void shell_init(void)
     command_length = 0;
     terminal_puts("ZevOS v0.1\n");
     terminal_puts("Welcome to the ZevOS shell.\n");
+    terminal_puts("As this only has the 'zev (root, uid 0)' account, you are automatically logged into it.\n");
     terminal_puts("Type 'help' for commands.\n\n");
     prompt();
 }
