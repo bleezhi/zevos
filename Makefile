@@ -7,7 +7,7 @@ RESCUE  := grub-mkrescue
 CFLAGS  := -ffreestanding -fno-stack-protector -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mcmodel=small -O2 -Wall -Wextra
 LDFLAGS := -T linker.ld -nostdlib -z max-page-size=0x1000
 
-OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o tss.o vmm.o zinit.o
+OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o tss.o vmm.o syscall.o syscall_asm.o zinit.o
 
 .PHONY: all clean check iso
 
@@ -26,6 +26,9 @@ usermode_asm.o: usermode.asm
 	$(AS) -f elf64 $< -o $@
 
 tss.o: tss.asm
+	$(AS) -f elf64 $< -o $@
+
+syscall_asm.o: syscall.asm
 	$(AS) -f elf64 $< -o $@
 
 interrupts_c.o: interrupts.c
