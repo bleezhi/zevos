@@ -28,7 +28,6 @@ _start:
     mov [multiboot_magic], eax
     mov [multiboot_info], ebx
 
-    ; Identity-map the first 1 GiB with 2 MiB pages.
     mov eax, page_table_l4
     mov cr3, eax
 
@@ -77,8 +76,6 @@ long_mode_start:
     mov rsp, stack_top
     and rsp, -16
 
-    ; Install the long-mode TSS. It provides RSP0 when ring 3
-    ; takes an interrupt back into the kernel.
     call tss_init
 
     mov edi, dword [multiboot_magic]
@@ -92,6 +89,7 @@ long_mode_start:
 
 section .rodata
 align 8
+global gdt64
 gdt64:
     dq 0
 .code equ $ - gdt64
@@ -103,14 +101,7 @@ gdt64:
 .user_data equ $ - gdt64
     dq 0x00CFF2000000FFFF       ; user data, selector 0x20 / RPL3=0x23
 .tss_low equ $ - gdt64
-    dw 0                        ; limit low, filled by tss_init
-    dw 0                        ; base low, filled by tss_init
-    db 0                        ; base mid
-    db 0x89                     ; present, available 64-bit TSS
-    db 0                        ; limit high + flags
-    db 0                        ; base high
-    dd 0                        ; base upper 32 bits
-    dd 0                        ; reserved
+    times 16 db 0
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64
@@ -126,10 +117,12 @@ stack_bottom: resb 16384
 stack_top:
 
 align 16
+global tss_stack_top
 tss_stack_bottom: resb 16384
 tss_stack_top:
 
 align 8
+global tss64
 tss64:
     resb 104
 
