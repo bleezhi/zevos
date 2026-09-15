@@ -28,8 +28,8 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
     terminal_puts("interrupts: IDT/PIC/PIT ready\n");
 
     keyboard_init();
-    shell_init();
     zinit_init();
+    shell_init();
 
     terminal_puts("ZevOS: kernel foundation ready\n");
 
