@@ -49,8 +49,10 @@ exception_common:
     push r13
     push r14
     push r15
-    mov rdi, rsp
+    sub rsp, 8
+    lea rdi, [rsp + 8]
     call exception_handler
+    add rsp, 8
     pop r15
     pop r14
     pop r13
@@ -86,8 +88,10 @@ irq_common:
     push r13
     push r14
     push r15
-    mov rdi, rsp
+    sub rsp, 8
+    lea rdi, [rsp + 8]
     call irq_handler
+    add rsp, 8
     pop r15
     pop r14
     pop r13
