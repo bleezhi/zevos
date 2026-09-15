@@ -10,7 +10,7 @@ tss_init:
     ; Zero the TSS.
     lea rdi, [rel tss64]
     xor eax, eax
-    mov ecx, 104 / 8
+    mov ecx, 13
     rep stosq
 
     ; TSS.rsp0 is the kernel stack used on a ring 3 -> ring 0 transition.
@@ -21,45 +21,39 @@ tss_init:
     mov word [rel tss64 + 102], 104
 
     ; Build the 16-byte 64-bit available TSS descriptor at GDT offset 0x28.
-    mov rax, tss64
-    mov rdx, rax
-    mov rcx, rax
-    and eax, 0xFFFF
-    and edx, 0xFFFFFF000000
-    shr rdx, 16
-    and ecx, 0xFFFFFFFF00000000
-    shr rcx, 32
-
-    mov r8, 103
-    or rax, r8
-    ; Rebuild low descriptor from limit/base fields.
+    ; Descriptor layout: limit, base[23:0], access, flags/limit, base[63:32].
+    mov r8, tss64
     xor rax, rax
     mov ax, 103
-    mov r8, tss64
+
     mov r9, r8
-    and r9d, 0xFFFF
+    and r9, 0xFFFF
     shl r9, 16
     or rax, r9
+
     mov r9, r8
-    shr r9, 24
-    and r9d, 0xFF
-    shl r9, 56
+    shr r9, 16
+    and r9, 0xFF
+    shl r9, 32
     or rax, r9
+
     mov r9, 0x89
     shl r9, 40
     or rax, r9
-    mov r9, tss64
-    shr r9, 16
-    and r9d, 0xFF
+
+    mov r9, r8
+    shr r9, 24
+    and r9, 0xFF
     shl r9, 56
     or rax, r9
-    ; Limit high is zero for a 104-byte TSS.
+
     mov [rel gdt64 + 0x28], rax
 
-    mov rax, tss64
+    mov rax, r8
     shr rax, 32
     mov [rel gdt64 + 0x30], rax
 
+    ; Reload the GDT after changing its TSS descriptor and load TR=0x28.
     lgdt [rel gdt_pointer]
     mov ax, 0x28
     ltr ax
