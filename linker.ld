@@ -3,6 +3,7 @@ ENTRY(_start)
 SECTIONS
 {
     . = 1M;
+    kernel_start = .;
 
     /* GRUB Multiboot2 requires the header to be early in the image. */
     .multiboot ALIGN(8) :
@@ -30,4 +31,7 @@ SECTIONS
         *(COMMON)
         *(.bss*)
     }
+
+    . = ALIGN(4096);
+    kernel_end = .;
 }
