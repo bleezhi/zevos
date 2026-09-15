@@ -1,0 +1,44 @@
+name: ZevOS Nightly
+
+on:
+  push:
+    branches:
+      - nightly
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc binutils nasm grub-common grub-pc-bin xorriso mtools
+
+      - name: Build ISO
+        run: make
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zevos-nightly-iso
+          path: os.iso
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          TAG="nightly-${{ github.run_number }}"
+          gh release create "$TAG" os.iso \
+            --target "$GITHUB_SHA" \
+            --title "ZevOS Nightly $DATE" \
+            --notes "Automated ZevOS nightly build from commit $GITHUB_SHA." \
+            --prerelease
