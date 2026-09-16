@@ -27,7 +27,12 @@ void keyboard_irq(void)
         uint8_t sc = inb(KEYBOARD_DATA);
         if (sc & 0x80)
             continue;
-        if (sc < sizeof(keys) - 1 && keys[sc])
+
+        /* PS/2 set 1 scancode 0x39 is Space. */
+        if (sc == 0x39) {
+            shell_input(' ');
+        } else if (sc < sizeof(keys) - 1 && keys[sc]) {
             shell_input(keys[sc]);
+        }
     }
 }
