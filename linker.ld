@@ -21,6 +21,12 @@ SECTIONS
         *(.rodata*)
     }
 
+    /* Embedded bytes copied into the first userspace code page. */
+    .userprog ALIGN(16) :
+    {
+        KEEP(*(.userprog))
+    }
+
     .data ALIGN(16) :
     {
         *(.data*)
