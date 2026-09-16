@@ -54,6 +54,9 @@ static uint64_t *build_identity_space(void)
 void vmm_init(void)
 {
     kernel_pml4 = build_identity_space();
+
+    if (kernel_pml4)
+        __asm__ volatile ("mov %0, %%cr3" :: "r"((uint64_t)kernel_pml4) : "memory");
 }
 
 uint64_t vmm_kernel_cr3(void)
