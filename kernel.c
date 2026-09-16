@@ -12,6 +12,7 @@ void process_init(void);
 void zinit_init(void);
 void vmm_init(void);
 void vfs_init(void);
+void fd_init(void);
 struct process;
 struct process *process_create_first_user(void);
 uint32_t process_first_user_error(void);
@@ -54,17 +55,20 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
     idt_init();
     terminal_puts("interrupts: IDT/PIC/PIT ready\n");
     keyboard_init();
-    zinit_init();
 
     vfs_init();
     terminal_puts("vfs: ramfs mounted at /\n");
+    fd_init();
+    terminal_puts("fd: stdin/stdout/stderr ready\n");
+
+    zinit_init();
     shell_init();
-    terminal_puts("ZevOS: kernel foundation ready\n");
+    terminal_puts("ZevOS: userspace bootstrap ready\n");
 
     struct process *first_user = process_create_first_user();
     if (first_user) {
-        terminal_puts("userspace: first process image ready\n");
-        terminal_puts("userspace: launching ring 3 test program...\n");
+        terminal_puts("userspace: ELF image loaded\n");
+        terminal_puts("userspace: launching zinit as PID 1...\n");
         process_launch_user(first_user);
     }
 
