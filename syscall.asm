@@ -4,10 +4,9 @@ global syscall_entry
 extern syscall_dispatch
 
 syscall_entry:
-    /* Early syscall ABI foundation: RAX is the syscall number.
-     * Arguments and full register preservation will be added with
-     * the real userspace process ABI.
-     */
+    ; Userspace ABI:
+    ; RAX = syscall number, RDI/RSI/RDX = arguments.
+    ; Preserve the callee-saved registers used by the kernel ABI.
     push rbp
     mov rbp, rsp
     push rbx
@@ -16,9 +15,11 @@ syscall_entry:
     push r14
     push r15
 
+    ; Rearrange registers for syscall_dispatch(number, arg1, arg2).
+    mov rdx, rsi
+    mov rsi, rdi
     mov rdi, rax
     call syscall_dispatch
-    mov r10, rax
 
     pop r15
     pop r14
@@ -26,7 +27,6 @@ syscall_entry:
     pop r12
     pop rbx
     pop rbp
-    mov rax, r10
     iretq
 
 section .note.GNU-stack noalloc noexec nowrite progbits
