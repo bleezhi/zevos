@@ -8,7 +8,6 @@
 #define PROCESS_RUNNING 2
 #define PROCESS_BLOCKED 3
 
-#define USER_CODE 0x400000ULL
 #define USER_STACK_TOP 0x701000ULL
 #define USER_STACK_PAGE 0x700000ULL
 
@@ -38,6 +37,8 @@ extern void page_free(void *address);
 extern void user_launch(uint64_t cr3, uint64_t entry, uint64_t stack);
 extern char user_program_start[];
 extern char user_program_end[];
+extern int elf_load_image(uint64_t cr3, const void *image, uint64_t image_size,
+                          uint64_t *entry_out, uint64_t *first_page_out);
 
 void process_destroy(struct process *process);
 
@@ -111,47 +112,32 @@ struct process *process_create(void)
     return 0;
 }
 
-/* Create a complete tiny userspace image: code + user stack. */
+/* Create the first userspace process from an ELF64 image. */
 struct process *process_create_first_user(void)
 {
     first_user_error = 0;
 
     struct process *process = process_create();
     if (!process) {
-        first_user_error = 1; /* address space or user stack creation */
+        first_user_error = 1;
         return 0;
     }
 
-    uint64_t code_size = (uint64_t)(user_program_end - user_program_start);
-    if (code_size == 0 || code_size > 4096) {
-        first_user_error = 2; /* invalid embedded userspace image */
+    uint64_t image_size = (uint64_t)(user_program_end - user_program_start);
+    uint64_t entry = 0;
+    uint64_t code_page = 0;
+    int elf_result = elf_load_image((uint64_t)process->page_table,
+                                    user_program_start, image_size,
+                                    &entry, &code_page);
+    if (elf_result != 0) {
+        first_user_error = 2;
         process_destroy(process);
         return 0;
     }
 
-    void *code_page = page_alloc();
-    if (!code_page) {
-        first_user_error = 3; /* no physical page for user code */
-        process_destroy(process);
-        return 0;
-    }
-
-    if (vmm_map_user_page((uint64_t)process->page_table, USER_CODE,
-                          (uint64_t)code_page) != 0) {
-        first_user_error = 4; /* user code virtual mapping failed */
-        page_free(code_page);
-        process_destroy(process);
-        return 0;
-    }
-
-    uint8_t *dst = (uint8_t *)code_page;
-    uint8_t *src = (uint8_t *)user_program_start;
-    for (uint64_t i = 0; i < code_size; ++i)
-        dst[i] = src[i];
-
-    process->user_code_phys = (uint64_t)code_page;
-    process->user_rip = USER_CODE;
-    process->instruction_pointer = USER_CODE;
+    process->user_code_phys = code_page;
+    process->user_rip = entry;
+    process->instruction_pointer = entry;
     return process;
 }
 
@@ -160,8 +146,6 @@ uint32_t process_first_user_error(void)
     return first_user_error;
 }
 
-/* Enter the first userspace process directly. The assembly helper loads its
- * CR3 and constructs the complete SS/RSP/RFLAGS/CS/RIP iretq frame. */
 void process_launch_user(struct process *process)
 {
     if (!process || !process->page_table || !process->user_rip || !process->user_rsp)
