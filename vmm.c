@@ -1,4 +1,4 @@
-/* ZevOS virtual-memory subsystem foundation. */
+/* ZevOS virtual-memory subsystem. */
 
 #include <stdint.h>
 
@@ -40,8 +40,6 @@ static uint64_t *build_identity_space(void)
     if (!pml4 || !pdpt || !pd)
         return 0;
 
-    /* Kernel identity mapping is supervisor-only. User pages are added
-     * explicitly below instead of exposing the first GiB to ring 3. */
     pml4[0] = (uint64_t)pdpt | PAGE_PRESENT | PAGE_WRITE;
     pdpt[0] = (uint64_t)pd | PAGE_PRESENT | PAGE_WRITE;
 
@@ -66,8 +64,29 @@ uint64_t vmm_kernel_cr3(void)
 
 uint64_t vmm_create_address_space(void)
 {
-    uint64_t *pml4 = build_identity_space();
-    return (uint64_t)pml4;
+    return (uint64_t)build_identity_space();
+}
+
+/* Split a 2 MiB identity mapping into 512 normal 4 KiB mappings. */
+static uint64_t *split_huge_page(uint64_t *pd, unsigned int pd_i)
+{
+    uint64_t entry = pd[pd_i];
+    if (!(entry & PAGE_PRESENT) || !(entry & PAGE_HUGE))
+        return 0;
+
+    uint64_t *pt = new_table();
+    if (!pt)
+        return 0;
+
+    uint64_t base = entry & ~0x1FFFFFULL;
+    uint64_t flags = entry & 0xFFFULL;
+    flags &= ~PAGE_HUGE;
+
+    for (unsigned int i = 0; i < PAGE_TABLE_ENTRIES; ++i)
+        pt[i] = (base + ((uint64_t)i * PAGE_SIZE)) | flags;
+
+    pd[pd_i] = (uint64_t)pt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    return pt;
 }
 
 /* Map one user virtual page to an already allocated physical page. */
@@ -111,8 +130,10 @@ int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_
         pt = new_table();
         if (!pt) return -1;
         pd[pd_i] = (uint64_t)pt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    } else if (pd[pd_i] & PAGE_HUGE) {
+        pt = split_huge_page(pd, pd_i);
+        if (!pt) return -1;
     } else {
-        if (pd[pd_i] & PAGE_HUGE) return -1;
         pt = (uint64_t *)(pd[pd_i] & ~0xFFFULL);
         pd[pd_i] |= PAGE_USER;
     }
