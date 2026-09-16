@@ -138,7 +138,11 @@ int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_
         pd[pd_i] |= PAGE_USER;
     }
 
-    if (pt[pt_i] & PAGE_PRESENT)
+    /* The fresh address space starts with supervisor-only identity mappings.
+     * Replace those mappings with the process's actual user page. A mapping
+     * that is already marked PAGE_USER is a real user mapping and must not be
+     * silently overwritten. */
+    if ((pt[pt_i] & PAGE_PRESENT) && (pt[pt_i] & PAGE_USER))
         return -1;
 
     pt[pt_i] = physical_address | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
