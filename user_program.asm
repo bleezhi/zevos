@@ -34,7 +34,7 @@ user_program_start:
 entry_point:
     mov rdi, 1
     mov rsi, MESSAGE
-    mov rdx, 25
+    mov rdx, 24
     mov rax, 1
     int 0x80
     xor rdi, rdi
