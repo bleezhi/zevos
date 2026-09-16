@@ -9,6 +9,7 @@ void terminal_clear(void);
 
 static char command[SHELL_MAX];
 static unsigned int command_length;
+static char cwd[64] = "/";
 
 static int string_equals(const char *a, const char *b)
 {
@@ -30,7 +31,9 @@ static int starts_with(const char *s, const char *prefix)
 
 static void prompt(void)
 {
-    terminal_puts("zev@ZevOS:~# ");
+    terminal_puts("zev@ZevOS:");
+    terminal_puts(cwd);
+    terminal_puts("# ");
 }
 
 static void execute_command(void)
@@ -46,11 +49,79 @@ static void execute_command(void)
         terminal_puts("  help       Show this help\n");
         terminal_puts("  clear      Clear the screen\n");
         terminal_puts("  echo TEXT  Print TEXT\n");
+        terminal_puts("  pwd        Print working directory\n");
+        terminal_puts("  ls         List directory\n");
+        terminal_puts("  cd DIR     Change directory\n");
+        terminal_puts("  whoami     Print current user\n");
+        terminal_puts("  id         Print user and group IDs\n");
+        terminal_puts("  uname      Print system information\n");
+        terminal_puts("  hostname   Print system hostname\n");
+        terminal_puts("  true       Return success\n");
+        terminal_puts("  false      Return failure\n");
         terminal_puts("  about      About ZevOS\n");
         terminal_puts("  ver        Show version\n");
         prompt();
     } else if (string_equals(command, "clear")) {
         terminal_clear();
+        prompt();
+    } else if (string_equals(command, "pwd")) {
+        terminal_puts(cwd);
+        terminal_putchar('\n');
+        prompt();
+    } else if (string_equals(command, "ls")) {
+        terminal_puts("bin  dev  etc  home  tmp  usr  var\n");
+        prompt();
+    } else if (string_equals(command, "ls /")) {
+        terminal_puts("bin  dev  etc  home  tmp  usr  var\n");
+        prompt();
+    } else if (string_equals(command, "cd /")) {
+        cwd[0] = '/';
+        cwd[1] = '\0';
+        prompt();
+    } else if (string_equals(command, "cd ..")) {
+        cwd[0] = '/';
+        cwd[1] = '\0';
+        prompt();
+    } else if (starts_with(command, "cd ")) {
+        const char *dir = command + 3;
+        if (string_equals(dir, "bin") || string_equals(dir, "dev") ||
+            string_equals(dir, "etc") || string_equals(dir, "home") ||
+            string_equals(dir, "tmp") || string_equals(dir, "usr") ||
+            string_equals(dir, "var")) {
+            if (cwd[1] == '\0') {
+                unsigned int i = 0;
+                cwd[0] = '/';
+                while (dir[i] && i < 60) {
+                    cwd[i + 1] = dir[i];
+                    ++i;
+                }
+                cwd[i + 1] = '\0';
+            } else {
+                terminal_puts("cd: nested directories are not available yet\n");
+            }
+        } else {
+            terminal_puts("cd: no such directory\n");
+        }
+        prompt();
+    } else if (string_equals(command, "whoami")) {
+        terminal_puts("zev\n");
+        prompt();
+    } else if (string_equals(command, "id")) {
+        terminal_puts("uid=0(zev) gid=0(zev) groups=0(zev)\n");
+        prompt();
+    } else if (string_equals(command, "uname")) {
+        terminal_puts("ZevOS\n");
+        prompt();
+    } else if (string_equals(command, "uname -a")) {
+        terminal_puts("ZevOS ZevOS 0.1 x86_64 ZevOS\n");
+        prompt();
+    } else if (string_equals(command, "hostname")) {
+        terminal_puts("ZevOS\n");
+        prompt();
+    } else if (string_equals(command, "true")) {
+        prompt();
+    } else if (string_equals(command, "false")) {
+        terminal_puts("false: command returned failure\n");
         prompt();
     } else if (string_equals(command, "about")) {
         terminal_puts("ZevOS - a tiny x86_64 hobby operating system.\n");
@@ -76,6 +147,8 @@ static void execute_command(void)
 void shell_init(void)
 {
     command_length = 0;
+    cwd[0] = '/';
+    cwd[1] = '\0';
     terminal_puts("ZevOS v0.1\n");
     terminal_puts("Welcome to the ZevOS shell.\n");
     terminal_puts("As this only has the 'zev (root, uid 0)' account, you are automatically logged into it.\n");
