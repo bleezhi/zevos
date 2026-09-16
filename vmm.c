@@ -138,8 +138,13 @@ int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_
         pd[pd_i] |= PAGE_USER;
     }
 
-    if (pt[pt_i] & PAGE_PRESENT)
-        return -1;
+    /* A split identity mapping already contains a supervisor-only PTE at
+     * this address. Replace that mapping with the requested user page.
+     * Refuse to silently replace an existing user mapping. */
+    if (pt[pt_i] & PAGE_PRESENT) {
+        if (pt[pt_i] & PAGE_USER)
+            return -1;
+    }
 
     pt[pt_i] = physical_address | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     return 0;
