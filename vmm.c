@@ -1,8 +1,4 @@
-/* ZevOS virtual-memory foundation.
- * Builds a fresh identity-mapped address space for the first 1 GiB.
- * User mappings are intentionally not enabled yet; this is the safe
- * foundation for per-process CR3 values and later ring-3 execution.
- */
+/* ZevOS virtual-memory subsystem foundation. */
 
 #include <stdint.h>
 
@@ -12,6 +8,9 @@
 #define PAGE_USER 4ULL
 #define PAGE_HUGE 128ULL
 #define PAGE_TABLE_ENTRIES 512
+
+#define USER_MIN 0x400000ULL
+#define USER_MAX 0x800000ULL
 
 extern void *page_alloc(void);
 
@@ -41,8 +40,10 @@ static uint64_t *build_identity_space(void)
     if (!pml4 || !pdpt || !pd)
         return 0;
 
-    pml4[0] = (uint64_t)pdpt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
-    pdpt[0] = (uint64_t)pd | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    /* Kernel identity mapping is supervisor-only. User pages are added
+     * explicitly below instead of exposing the first GiB to ring 3. */
+    pml4[0] = (uint64_t)pdpt | PAGE_PRESENT | PAGE_WRITE;
+    pdpt[0] = (uint64_t)pd | PAGE_PRESENT | PAGE_WRITE;
 
     for (unsigned int i = 0; i < PAGE_TABLE_ENTRIES; ++i)
         pd[i] = ((uint64_t)i << 21) | PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE;
@@ -64,4 +65,58 @@ uint64_t vmm_create_address_space(void)
 {
     uint64_t *pml4 = build_identity_space();
     return (uint64_t)pml4;
+}
+
+/* Map one user virtual page to an already allocated physical page. */
+int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_address)
+{
+    if (!cr3 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
+        (physical_address & (PAGE_SIZE - 1)) != 0 ||
+        virtual_address < USER_MIN || virtual_address >= USER_MAX)
+        return -1;
+
+    uint64_t *pml4 = (uint64_t *)cr3;
+    unsigned int pml4_i = (unsigned int)((virtual_address >> 39) & 0x1FF);
+    unsigned int pdpt_i = (unsigned int)((virtual_address >> 30) & 0x1FF);
+    unsigned int pd_i   = (unsigned int)((virtual_address >> 21) & 0x1FF);
+    unsigned int pt_i   = (unsigned int)((virtual_address >> 12) & 0x1FF);
+
+    uint64_t *pdpt;
+    uint64_t *pd;
+    uint64_t *pt;
+
+    if (!(pml4[pml4_i] & PAGE_PRESENT)) {
+        pdpt = new_table();
+        if (!pdpt) return -1;
+        pml4[pml4_i] = (uint64_t)pdpt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    } else {
+        pdpt = (uint64_t *)(pml4[pml4_i] & ~0xFFFULL);
+        pml4[pml4_i] |= PAGE_USER;
+    }
+
+    if (!(pdpt[pdpt_i] & PAGE_PRESENT)) {
+        pd = new_table();
+        if (!pd) return -1;
+        pdpt[pdpt_i] = (uint64_t)pd | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    } else {
+        if (pdpt[pdpt_i] & PAGE_HUGE) return -1;
+        pd = (uint64_t *)(pdpt[pdpt_i] & ~0xFFFULL);
+        pdpt[pdpt_i] |= PAGE_USER;
+    }
+
+    if (!(pd[pd_i] & PAGE_PRESENT)) {
+        pt = new_table();
+        if (!pt) return -1;
+        pd[pd_i] = (uint64_t)pt | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    } else {
+        if (pd[pd_i] & PAGE_HUGE) return -1;
+        pt = (uint64_t *)(pd[pd_i] & ~0xFFFULL);
+        pd[pd_i] |= PAGE_USER;
+    }
+
+    if (pt[pt_i] & PAGE_PRESENT)
+        return -1;
+
+    pt[pt_i] = physical_address | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    return 0;
 }
