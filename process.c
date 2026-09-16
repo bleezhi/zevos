@@ -38,6 +38,8 @@ extern void user_launch(uint64_t cr3, uint64_t entry, uint64_t stack);
 extern char user_program_start[];
 extern char user_program_end[];
 
+void process_destroy(struct process *process);
+
 static unsigned int next_ready(unsigned int start)
 {
     for (unsigned int n = 1; n <= PROCESS_MAX; ++n) {
