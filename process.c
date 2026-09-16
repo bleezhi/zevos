@@ -8,6 +8,7 @@
 #define PROCESS_RUNNING 2
 #define PROCESS_BLOCKED 3
 
+#define USER_CODE 0x400000ULL
 #define USER_STACK_TOP 0x701000ULL
 #define USER_STACK_PAGE 0x700000ULL
 
@@ -21,6 +22,7 @@ struct process {
     uint64_t user_rip;
     uint64_t user_rsp;
     uint64_t user_stack_phys;
+    uint64_t user_code_phys;
 };
 
 static struct process processes[PROCESS_MAX];
@@ -32,6 +34,9 @@ extern uint64_t vmm_create_address_space(void);
 extern int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_address);
 extern void *page_alloc(void);
 extern void page_free(void *address);
+extern void user_launch(uint64_t cr3, uint64_t entry, uint64_t stack);
+extern char user_program_start[];
+extern char user_program_end[];
 
 static unsigned int next_ready(unsigned int start)
 {
@@ -57,6 +62,7 @@ void process_init(void)
         processes[i].user_rip = 0;
         processes[i].user_rsp = 0;
         processes[i].user_stack_phys = 0;
+        processes[i].user_code_phys = 0;
     }
 
     processes[0].pid = next_pid++;
@@ -92,9 +98,63 @@ struct process *process_create(void)
         processes[i].user_rip = 0;
         processes[i].user_rsp = USER_STACK_TOP;
         processes[i].user_stack_phys = (uint64_t)stack_page;
+        processes[i].user_code_phys = 0;
         return &processes[i];
     }
     return 0;
+}
+
+/* Create a complete tiny userspace image: code + user stack. */
+struct process *process_create_first_user(void)
+{
+    struct process *process = process_create();
+    if (!process)
+        return 0;
+
+    uint64_t code_size = (uint64_t)(user_program_end - user_program_start);
+    if (code_size > 4096) {
+        process_destroy(process);
+        return 0;
+    }
+
+    void *code_page = page_alloc();
+    if (!code_page) {
+        process_destroy(process);
+        return 0;
+    }
+
+    if (vmm_map_user_page((uint64_t)process->page_table, USER_CODE,
+                          (uint64_t)code_page) != 0) {
+        page_free(code_page);
+        process_destroy(process);
+        return 0;
+    }
+
+    uint8_t *dst = (uint8_t *)code_page;
+    uint8_t *src = (uint8_t *)user_program_start;
+    for (uint64_t i = 0; i < code_size; ++i)
+        dst[i] = src[i];
+
+    process->user_code_phys = (uint64_t)code_page;
+    process->user_rip = USER_CODE;
+    process->instruction_pointer = USER_CODE;
+    return process;
+}
+
+/* Enter the first userspace process directly. The assembly helper loads its
+ * CR3 and constructs the complete SS/RSP/RFLAGS/CS/RIP iretq frame. */
+void process_launch_user(struct process *process)
+{
+    if (!process || !process->page_table || !process->user_rip || !process->user_rsp)
+        return;
+
+    current_index = (unsigned int)(process - processes);
+    process->state = PROCESS_RUNNING;
+    user_launch((uint64_t)process->page_table,
+                process->user_rip,
+                process->user_rsp);
+
+    __builtin_unreachable();
 }
 
 void process_destroy(struct process *process)
@@ -104,6 +164,8 @@ void process_destroy(struct process *process)
 
     if (process->user_stack_phys)
         page_free((void *)process->user_stack_phys);
+    if (process->user_code_phys)
+        page_free((void *)process->user_code_phys);
 
     process->state = PROCESS_UNUSED;
     process->pid = 0;
@@ -114,10 +176,9 @@ void process_destroy(struct process *process)
     process->user_rip = 0;
     process->user_rsp = 0;
     process->user_stack_phys = 0;
+    process->user_code_phys = 0;
 }
 
-/* Select the next runnable process. A process with no prepared kernel stack
- * is left alone until the context/ELF layer supplies one. */
 void scheduler_tick(void)
 {
     unsigned int old = current_index;
