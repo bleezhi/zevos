@@ -83,11 +83,14 @@ struct process *process_create(void)
             return 0;
 
         void *stack_page = page_alloc();
-        if (!stack_page)
+        if (!stack_page) {
+            page_free((void *)cr3);
             return 0;
+        }
 
         if (vmm_map_user_page(cr3, USER_STACK_PAGE, (uint64_t)stack_page) != 0) {
             page_free(stack_page);
+            page_free((void *)cr3);
             return 0;
         }
 
