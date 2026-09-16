@@ -28,6 +28,7 @@ struct process {
 static struct process processes[PROCESS_MAX];
 static uint32_t next_pid = 1;
 static uint32_t current_index;
+static uint32_t first_user_error;
 
 extern void process_switch(uint64_t *old_rsp, uint64_t new_rsp);
 extern uint64_t vmm_create_address_space(void);
@@ -70,6 +71,7 @@ void process_init(void)
     processes[0].pid = next_pid++;
     processes[0].state = PROCESS_RUNNING;
     current_index = 0;
+    first_user_error = 0;
 }
 
 struct process *process_create(void)
@@ -112,24 +114,31 @@ struct process *process_create(void)
 /* Create a complete tiny userspace image: code + user stack. */
 struct process *process_create_first_user(void)
 {
+    first_user_error = 0;
+
     struct process *process = process_create();
-    if (!process)
+    if (!process) {
+        first_user_error = 1; /* address space or user stack creation */
         return 0;
+    }
 
     uint64_t code_size = (uint64_t)(user_program_end - user_program_start);
-    if (code_size > 4096) {
+    if (code_size == 0 || code_size > 4096) {
+        first_user_error = 2; /* invalid embedded userspace image */
         process_destroy(process);
         return 0;
     }
 
     void *code_page = page_alloc();
     if (!code_page) {
+        first_user_error = 3; /* no physical page for user code */
         process_destroy(process);
         return 0;
     }
 
     if (vmm_map_user_page((uint64_t)process->page_table, USER_CODE,
                           (uint64_t)code_page) != 0) {
+        first_user_error = 4; /* user code virtual mapping failed */
         page_free(code_page);
         process_destroy(process);
         return 0;
@@ -144,6 +153,11 @@ struct process *process_create_first_user(void)
     process->user_rip = USER_CODE;
     process->instruction_pointer = USER_CODE;
     return process;
+}
+
+uint32_t process_first_user_error(void)
+{
+    return first_user_error;
 }
 
 /* Enter the first userspace process directly. The assembly helper loads its
