@@ -1,0 +1,1 @@
+Stage 0 userspace ls source is tracked in this directory. Its full directory enumeration syscall will be implemented with the userspace shell migration.
