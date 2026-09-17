@@ -1,6 +1,8 @@
 ; ZevOS - Multiboot2 x86_64 entry point
 ; GRUB enters us in 32-bit protected mode. This trampoline enables
 ; PAE + long mode, installs identity-mapped 2 MiB pages, then calls C.
+; Direct HDA boot enters the same 32-bit entry with the Multiboot magic
+; supplied by hda_boot.asm and a null info pointer.
 
 BITS 32
 
@@ -21,6 +23,8 @@ align 16
 global _start
 extern kernel_main
 extern tss_init
+extern kernel_bss_start
+extern kernel_bss_end
 
 _start:
     cli
@@ -76,6 +80,16 @@ long_mode_start:
     mov rsp, stack_top
     and rsp, -16
 
+    ; GRUB normally gives us zeroed BSS. Direct HDA boot does not, so
+    ; explicitly clear it before any global/BSS-backed subsystem runs.
+    cld
+    mov rdi, kernel_bss_start
+    mov rcx, kernel_bss_end
+    sub rcx, rdi
+    shr rcx, 3
+    xor eax, eax
+    rep stosq
+
     call tss_init
 
     mov edi, dword [multiboot_magic]
@@ -101,7 +115,7 @@ gdt64:
 .user_data equ $ - gdt64
     dq 0x00CFF2000000FFFF       ; user data, selector 0x20 / RPL3=0x23
 .tss_low equ $ - gdt64
-    times 16 db 0
+times 16 db 0
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64
