@@ -6,6 +6,8 @@
 #define KEYBOARD_STATUS 0x64
 
 void shell_input(char c);
+int installer_active(void);
+void installer_input(char c);
 
 static volatile uint32_t input_activity;
 
@@ -17,6 +19,14 @@ static inline uint8_t inb(uint16_t port)
 }
 
 static const char keys[] = "\0\0" "1234567890-=\b\t" "qwertyuiop[]\n" "\0asdfghjkl;'`" "\0\\zxcvbnm,./";
+
+static void deliver_key(char c)
+{
+    if (installer_active())
+        installer_input(c);
+    else
+        shell_input(c);
+}
 
 void keyboard_init(void)
 {
@@ -30,15 +40,13 @@ void keyboard_irq(void)
         if (sc & 0x80)
             continue;
 
-        /* Any make code counts as user input. Future USB/HID drivers can
-         * call input_activity_mark() too, so boot policy stays device-neutral. */
         input_activity = 1;
 
         /* PS/2 set 1 scancode 0x39 is Space. */
         if (sc == 0x39) {
-            shell_input(' ');
+            deliver_key(' ');
         } else if (sc < sizeof(keys) - 1 && keys[sc]) {
-            shell_input(keys[sc]);
+            deliver_key(keys[sc]);
         }
     }
 }
