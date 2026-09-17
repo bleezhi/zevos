@@ -25,11 +25,20 @@ jobs:
       - name: Build ISO
         run: make
 
+      - name: Build bootable HDA image
+        run: make hda
+
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: zevos-nightly-iso
           path: os.iso
+
+      - name: Upload HDA image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zevos-nightly-hda
+          path: zevos-hda.img
 
       - name: Create GitHub pre-release
         env:
@@ -37,8 +46,8 @@ jobs:
         run: |
           DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
           TAG="nightly-${{ github.run_number }}"
-          gh release create "$TAG" os.iso \
+          gh release create "$TAG" os.iso zevos-hda.img \
             --target "$GITHUB_SHA" \
             --title "ZevOS Nightly $DATE" \
-            --notes "Automated ZevOS nightly build from commit $GITHUB_SHA." \
+            --notes "Automated ZevOS nightly build from commit $GITHUB_SHA. Includes the ISO and bootable HDA image." \
             --prerelease
