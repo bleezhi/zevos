@@ -102,8 +102,8 @@ dap:
 .offset: dw 0
 .segment: dw 0
 .buffer_lo: dd 0
+.buffer_hi: dd 0
 .lba_lo: dd 0
 .lba_hi: dd 0
-.buffer_hi: dd 0
 times 510-($-$$) db 0
 dw 0xAA55
