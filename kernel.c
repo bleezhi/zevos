@@ -6,6 +6,8 @@ void terminal_init(void);
 void terminal_puts(const char *s);
 void idt_init(void);
 void keyboard_init(void);
+uint32_t input_activity_seen(void);
+uint64_t timer_ticks(void);
 void shell_init(void);
 void pmm_init(unsigned int multiboot_info);
 void process_init(void);
@@ -14,7 +16,7 @@ void vmm_init(void);
 void vfs_init(void);
 void fd_init(void);
 struct process;
-struct process *process_create_first_user(void);
+struct process *process_create_first_user_named(const char *name);
 uint32_t process_first_user_error(void);
 void process_launch_user(struct process *process);
 
@@ -24,6 +26,26 @@ static void print_digit(uint32_t value)
     s[0] = (char)('0' + (value % 10));
     s[1] = 0;
     terminal_puts(s);
+}
+
+static void wait_for_boot_input_or_timeout(void)
+{
+    const uint64_t start = timer_ticks();
+    const uint64_t timeout = 200; /* PIT is configured for ~100 Hz. */
+
+    terminal_puts("boot: waiting 2 seconds for PS/2/USB input...\n");
+    __asm__ volatile ("sti");
+
+    while ((timer_ticks() - start) < timeout) {
+        if (input_activity_seen()) {
+            terminal_puts("boot: input detected, staying in shell\n");
+            return;
+        }
+        __asm__ volatile ("hlt");
+    }
+
+    if (!input_activity_seen())
+        terminal_puts("boot: no input detected, launching dsplayed\n");
 }
 
 void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
@@ -65,16 +87,24 @@ void kernel_main(unsigned int multiboot_magic, unsigned int multiboot_info)
     shell_init();
     terminal_puts("ZevOS: userspace bootstrap ready\n");
 
-    struct process *first_user = process_create_first_user();
-    if (first_user) {
-        terminal_puts("userspace: ELF image loaded\n");
-        terminal_puts("userspace: launching zinit as PID 1...\n");
-        process_launch_user(first_user);
+    wait_for_boot_input_or_timeout();
+
+    /* dsplayed is the first display-manager userspace slot. Its executable
+     * is still the bootstrap ELF for now; the real display-server program
+     * will replace it once the graphics/userspace stack is ready. */
+    if (!input_activity_seen()) {
+        struct process *display_manager =
+            process_create_first_user_named("dsplayed");
+        if (display_manager) {
+            terminal_puts("userspace: dsplayed process ready\n");
+            process_launch_user(display_manager);
+        }
+
+        terminal_puts("userspace: failed to create dsplayed (stage ");
+        print_digit(process_first_user_error());
+        terminal_puts(")\n");
     }
 
-    terminal_puts("userspace: failed to create first process (stage ");
-    print_digit(process_first_user_error());
-    terminal_puts(")\n");
     __asm__ volatile ("sti");
     for (;;) __asm__ volatile ("hlt");
 }
