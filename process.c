@@ -130,7 +130,7 @@ struct process *process_create_first_user(void)
                                     user_program_start, image_size,
                                     &entry, &code_page);
     if (elf_result != 0) {
-        first_user_error = 2;
+        first_user_error = (uint32_t)(100 - elf_result);
         process_destroy(process);
         return 0;
     }
