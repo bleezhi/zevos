@@ -1,0 +1,1 @@
+Stage 0 userspace tree is now tracked in Git. The live VFS remains the boot-time image until persistent HDA storage is implemented.
