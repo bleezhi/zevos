@@ -13,13 +13,21 @@ struct elf64_phdr {
     uint64_t paddr; uint64_t filesz; uint64_t memsz; uint64_t align;
 };
 
-static uint64_t u32(uint32_t v) { return v; }
-
-/* Make a tiny ET_EXEC that exercises the real userspace syscall path. */
-static uint64_t make_program(uint8_t *image, const char *message)
+static unsigned int str_len(const char *s)
 {
-    uint64_t msg_len = 0;
-    while (message[msg_len]) ++msg_len;
+    unsigned int n = 0;
+    while (s[n]) ++n;
+    return n;
+}
+
+/* Build a tiny ET_EXEC that uses the real SYS_WRITE/SYS_EXIT ABI.
+ * If stay_alive is set, the process remains in ring 3 after writing. */
+static uint64_t make_program(uint8_t *image, const char *message, int stay_alive)
+{
+    const unsigned int code_offset = 0x100;
+    const unsigned int message_offset_base = 0x100;
+    unsigned int message_length = str_len(message);
+    unsigned int p = 0;
 
     for (unsigned int i = 0; i < 512; ++i) image[i] = 0;
 
@@ -30,56 +38,64 @@ static uint64_t make_program(uint8_t *image, const char *message)
     eh->entry = 0x400100; eh->phoff = 64; eh->ehsize = 64;
     eh->phentsize = 56; eh->phnum = 1;
 
-    struct elf64_phdr *ph = (struct elf64_phdr *)(image + 64);
-    ph->type = 1; ph->flags = 5; ph->offset = 0x100; ph->vaddr = 0x400000;
-    ph->filesz = 0x3a + msg_len; ph->memsz = ph->filesz; ph->align = 0x1000;
-
-    uint8_t *code = image + 0x100;
-    unsigned int p = 0;
+    uint8_t *code = image + code_offset;
     /* mov rax, SYS_WRITE */
     code[p++] = 0x48; code[p++] = 0xc7; code[p++] = 0xc0;
     code[p++] = 1; code[p++] = 0; code[p++] = 0; code[p++] = 0;
     /* mov rdi, stdout */
     code[p++] = 0x48; code[p++] = 0xc7; code[p++] = 0xc7;
     code[p++] = 1; code[p++] = 0; code[p++] = 0; code[p++] = 0;
-    /* mov rsi, message virtual address */
+    /* mov rsi, message virtual address (filled after code length is known) */
     code[p++] = 0x48; code[p++] = 0xbe;
-    uint64_t addr = 0x400100 + 0x3a;
-    for (unsigned int i = 0; i < 8; ++i) code[p++] = (uint8_t)(addr >> (i * 8));
+    unsigned int address_patch = p;
+    for (unsigned int i = 0; i < 8; ++i) code[p++] = 0;
     /* mov rdx, message length */
     code[p++] = 0x48; code[p++] = 0xc7; code[p++] = 0xc2;
-    code[p++] = (uint8_t)msg_len; code[p++] = 0; code[p++] = 0; code[p++] = 0;
+    code[p++] = (uint8_t)message_length; code[p++] = 0; code[p++] = 0; code[p++] = 0;
     /* int 0x80 */
     code[p++] = 0xcd; code[p++] = 0x80;
-    /* mov rax, SYS_EXIT */
-    code[p++] = 0x48; code[p++] = 0xc7; code[p++] = 0xc0;
-    code[p++] = 3; code[p++] = 0; code[p++] = 0; code[p++] = 0;
-    /* xor rdi, rdi; int 0x80 */
-    code[p++] = 0x48; code[p++] = 0x31; code[p++] = 0xff;
-    code[p++] = 0xcd; code[p++] = 0x80;
 
-    for (uint64_t i = 0; i < msg_len; ++i) image[0x100 + 0x3a + i] = (uint8_t)message[i];
-    (void)u32;
-    return 0x100 + 0x3a + msg_len;
+    if (stay_alive) {
+        /* jmp $ -- keep the display server alive in ring 3 for stage 0. */
+        code[p++] = 0xeb; code[p++] = 0xfe;
+    } else {
+        /* mov rax, SYS_EXIT; xor rdi,rdi; int 0x80 */
+        code[p++] = 0x48; code[p++] = 0xc7; code[p++] = 0xc0;
+        code[p++] = 3; code[p++] = 0; code[p++] = 0; code[p++] = 0;
+        code[p++] = 0x48; code[p++] = 0x31; code[p++] = 0xff;
+        code[p++] = 0xcd; code[p++] = 0x80;
+    }
+
+    uint64_t message_address = 0x400000ULL + code_offset + p;
+    for (unsigned int i = 0; i < 8; ++i)
+        code[address_patch + i] = (uint8_t)(message_address >> (i * 8));
+
+    for (unsigned int i = 0; i < message_length; ++i)
+        image[message_offset_base + p + i] = (uint8_t)message[i];
+
+    struct elf64_phdr *ph = (struct elf64_phdr *)(image + 64);
+    ph->type = 1; ph->flags = 5; ph->offset = code_offset; ph->vaddr = 0x400000;
+    ph->filesz = p + message_length; ph->memsz = ph->filesz; ph->align = 0x1000;
+
+    return code_offset + p + message_length;
+}
+
+static void install_program(const char *path, const char *message, int stay_alive)
+{
+    uint8_t image[512];
+    uint64_t size = make_program(image, message, stay_alive);
+    vfs_touch(path);
+    vfs_write_binary(path, image, size);
 }
 
 void vfs_install_binaries(void)
 {
-    uint8_t image[512];
-    make_program(image, "echo: ZevOS\n");
-    vfs_touch("/bin/echo"); vfs_write_binary("/bin/echo", image, 0x100 + 0x3a + 12);
-    make_program(image, "cat: /etc/motd\n");
-    vfs_touch("/bin/cat"); vfs_write_binary("/bin/cat", image, 0x100 + 0x3a + 15);
-    make_program(image, "ls: /bin /dev /etc /home /tmp /usr /var\n");
-    vfs_touch("/bin/ls"); vfs_write_binary("/bin/ls", image, 0x100 + 0x3a + 40);
-    make_program(image, "pwd: /\n");
-    vfs_touch("/bin/pwd"); vfs_write_binary("/bin/pwd", image, 0x100 + 0x3a + 7);
-    make_program(image, "true\n");
-    vfs_touch("/bin/true"); vfs_write_binary("/bin/true", image, 0x100 + 0x3a + 5);
-    make_program(image, "false\n");
-    vfs_touch("/bin/false"); vfs_write_binary("/bin/false", image, 0x100 + 0x3a + 6);
-    make_program(image, "zinit: userspace PID 1\n");
-    vfs_touch("/bin/zinit"); vfs_write_binary("/bin/zinit", image, 0x100 + 0x3a + 23);
-    make_program(image, "dsplayed: display server\n");
-    vfs_touch("/bin/dsplayed"); vfs_write_binary("/bin/dsplayed", image, 0x100 + 0x3a + 26);
+    install_program("/bin/echo", "echo: ZevOS\n", 0);
+    install_program("/bin/cat", "cat: /etc/motd\n", 0);
+    install_program("/bin/ls", "ls: /bin /dev /etc /home /tmp /usr /var\n", 0);
+    install_program("/bin/pwd", "pwd: /\n", 0);
+    install_program("/bin/true", "true\n", 0);
+    install_program("/bin/false", "false\n", 0);
+    install_program("/bin/zinit", "zinit: userspace PID 1\n", 0);
+    install_program("/bin/dsplayed", "dsplayed: display server\n", 1);
 }
