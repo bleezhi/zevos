@@ -12,6 +12,10 @@ syscall_entry:
     push r14
     push r15
 
+    ; CPU's ring-3 interrupt frame leaves RSP misaligned for SysV calls.
+    ; Add 8 bytes so syscall_dispatch enters with the required alignment.
+    sub rsp, 8
+
     ; syscall_dispatch(number, arg1, arg2, arg3)
     mov rcx, rdx
     mov rdx, rsi
@@ -19,6 +23,7 @@ syscall_entry:
     mov rdi, rax
     call syscall_dispatch
 
+    add rsp, 8
     pop r15
     pop r14
     pop r13
