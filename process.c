@@ -14,6 +14,7 @@
 struct process {
     uint32_t pid;
     uint32_t state;
+    const char *name;
     uint64_t *page_table;
     uint64_t kernel_stack;
     uint64_t kernel_rsp;
@@ -61,6 +62,7 @@ void process_init(void)
     for (unsigned int i = 0; i < PROCESS_MAX; ++i) {
         processes[i].pid = 0;
         processes[i].state = PROCESS_UNUSED;
+        processes[i].name = 0;
         processes[i].page_table = 0;
         processes[i].kernel_stack = 0;
         processes[i].kernel_rsp = 0;
@@ -73,6 +75,7 @@ void process_init(void)
 
     processes[0].pid = next_pid++;
     processes[0].state = PROCESS_RUNNING;
+    processes[0].name = "kernel";
     current_index = 0;
     first_user_error = 0;
 }
@@ -101,6 +104,7 @@ struct process *process_create(void)
 
         processes[i].pid = next_pid++;
         processes[i].state = PROCESS_READY;
+        processes[i].name = "process";
         processes[i].page_table = (uint64_t *)cr3;
         processes[i].kernel_stack = 0;
         processes[i].kernel_rsp = 0;
@@ -114,8 +118,8 @@ struct process *process_create(void)
     return 0;
 }
 
-/* Create the first userspace process from an ELF64 image. */
-struct process *process_create_first_user(void)
+/* Create the first userspace process from an ELF64 image and give it a name. */
+struct process *process_create_first_user_named(const char *name)
 {
     first_user_error = 0;
 
@@ -124,6 +128,7 @@ struct process *process_create_first_user(void)
         first_user_error = 1;
         return 0;
     }
+    process->name = name ? name : "process";
 
     uint64_t image_size = (uint64_t)(user_program_end - user_program_start);
     uint64_t entry = 0;
@@ -141,6 +146,11 @@ struct process *process_create_first_user(void)
     process->user_rip = entry;
     process->instruction_pointer = entry;
     return process;
+}
+
+struct process *process_create_first_user(void)
+{
+    return process_create_first_user_named("zinit");
 }
 
 uint32_t process_first_user_error(void)
@@ -162,9 +172,6 @@ void process_launch_user(struct process *process)
     __builtin_unreachable();
 }
 
-/* Tear down the currently running userspace process. The assembly handoff
- * abandons the task's ring-0 stack and resumes on the dedicated kernel/TSS
- * stack, so this function never returns to the terminated ring-3 task. */
 __attribute__((noreturn)) void process_exit_current(uint64_t status)
 {
     struct process *process = &processes[current_index];
@@ -176,7 +183,6 @@ __attribute__((noreturn)) void process_exit_current(uint64_t status)
     __builtin_unreachable();
 }
 
-/* Final bootstrap destination after the first userspace process exits. */
 __attribute__((noreturn)) void process_exit_idle(uint64_t status)
 {
     terminal_puts("userspace: process exited\n");
@@ -199,6 +205,7 @@ void process_destroy(struct process *process)
 
     process->state = PROCESS_UNUSED;
     process->pid = 0;
+    process->name = 0;
     process->page_table = 0;
     process->kernel_stack = 0;
     process->kernel_rsp = 0;
