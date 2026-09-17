@@ -8,9 +8,13 @@ RESCUE  := grub-mkrescue
 CFLAGS  := -ffreestanding -fno-stack-protector -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mcmodel=small -O2 -Wall -Wextra
 LDFLAGS := -T linker.ld -nostdlib -z max-page-size=0x1000
 
+HDA_IMAGE := zevos-hda.img
+HDA_SIZE_MB := 64
+HDA_KERNEL_LBA := 2
+
 OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o hda_boot_embed.o
 
-.PHONY: all clean check iso
+.PHONY: all clean check iso hda
 
 all: os.iso
 
@@ -65,5 +69,17 @@ os.iso: kernel.elf grub.cfg
 	cp grub.cfg iso/boot/grub/grub.cfg
 	$(RESCUE) -o $@ iso
 
+hda: kernel.elf hda_boot.bin
+	$(OBJCOPY) -O binary kernel.elf kernel.bin
+	@sectors=$$(( ($$(wc -c < kernel.bin) + 511) / 512 )); \
+	printf 'ZBOT' > hda_header.bin; \
+	python3 -c "import struct; n=int('$$sectors'); open('hda_header.bin','ab').write(struct.pack('<I', n)); open('hda_header.bin','ab').write(b'\\0'*504)"; \
+	dd if=/dev/zero of=$(HDA_IMAGE) bs=1M count=$(HDA_SIZE_MB) status=none; \
+	dd if=hda_boot.bin of=$(HDA_IMAGE) bs=512 count=1 conv=notrunc status=none; \
+	dd if=hda_header.bin of=$(HDA_IMAGE) bs=512 seek=1 conv=notrunc status=none; \
+	dd if=kernel.bin of=$(HDA_IMAGE) bs=512 seek=$(HDA_KERNEL_LBA) conv=notrunc status=none; \
+	rm -f hda_header.bin kernel.bin; \
+	echo "Created $(HDA_IMAGE) ($$sectors kernel sectors)"
+
 clean:
-	rm -rf *.o *.elf *.iso *.bin iso
+	rm -rf *.o *.elf *.iso *.bin *.img iso
