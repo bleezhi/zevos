@@ -30,6 +30,7 @@ static uint32_t current_index;
 static uint32_t first_user_error;
 
 extern void process_switch(uint64_t *old_rsp, uint64_t new_rsp);
+extern void process_exit_handoff(uint64_t status);
 extern uint64_t vmm_create_address_space(void);
 extern int vmm_map_user_page(uint64_t cr3, uint64_t virtual_address, uint64_t physical_address);
 extern void *page_alloc(void);
@@ -39,6 +40,7 @@ extern char user_program_start[];
 extern char user_program_end[];
 extern int elf_load_image(uint64_t cr3, const void *image, uint64_t image_size,
                           uint64_t *entry_out, uint64_t *first_page_out);
+extern void terminal_puts(const char *s);
 
 void process_destroy(struct process *process);
 
@@ -158,6 +160,31 @@ void process_launch_user(struct process *process)
                 process->user_rsp);
 
     __builtin_unreachable();
+}
+
+/* Tear down the currently running userspace process. The assembly handoff
+ * abandons the task's ring-0 stack and resumes on the dedicated kernel/TSS
+ * stack, so this function never returns to the terminated ring-3 task. */
+__attribute__((noreturn)) void process_exit_current(uint64_t status)
+{
+    struct process *process = &processes[current_index];
+
+    if (process != &processes[0])
+        process_destroy(process);
+
+    process_exit_handoff(status);
+    __builtin_unreachable();
+}
+
+/* Final bootstrap destination after the first userspace process exits. */
+__attribute__((noreturn)) void process_exit_idle(uint64_t status)
+{
+    terminal_puts("userspace: process exited\n");
+    (void)status;
+
+    for (;;) {
+        __asm__ volatile ("sti\n\thlt");
+    }
 }
 
 void process_destroy(struct process *process)
