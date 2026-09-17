@@ -9,6 +9,9 @@
 #define FD_STDOUT 3
 #define FD_STDERR 4
 
+#define USER_MIN 0x400000ULL
+#define USER_MAX 0x800000ULL
+
 struct fd_entry {
     uint8_t state;
     char path[128];
@@ -17,9 +20,18 @@ struct fd_entry {
 static struct fd_entry fds[FD_MAX];
 extern void terminal_putchar(char c);
 
+static uint64_t user_range_ok(uint64_t ptr, uint64_t count)
+{
+    if (ptr < USER_MIN || ptr >= USER_MAX)
+        return 0;
+    if (count > USER_MAX - ptr)
+        return 0;
+    return 1;
+}
+
 static uint64_t user_ptr_ok(uint64_t ptr)
 {
-    return ptr >= 0x400000ULL && ptr < 0x800000ULL;
+    return user_range_ok(ptr, 1);
 }
 
 void fd_init(void)
@@ -39,6 +51,8 @@ static int copy_user_string(char *dst, uint64_t src, unsigned int max)
         return -1;
     const char *s = (const char *)src;
     for (unsigned int i = 0; i + 1 < max; ++i) {
+        if (!user_ptr_ok(src + i))
+            return -1;
         dst[i] = s[i];
         if (dst[i] == 0)
             return 0;
@@ -81,7 +95,7 @@ int fd_write(int fd, uint64_t user_buffer, uint64_t count)
 {
     if (fd != 1 && fd != 2)
         return -1;
-    if (!user_ptr_ok(user_buffer) || count > 4096)
+    if (count > 4096 || !user_range_ok(user_buffer, count))
         return -1;
 
     const char *buffer = (const char *)user_buffer;
@@ -93,7 +107,7 @@ int fd_write(int fd, uint64_t user_buffer, uint64_t count)
 int fd_read(int fd, uint64_t user_buffer, uint64_t count)
 {
     if (fd < 3 || fd >= FD_MAX || fds[fd].state != FD_FILE ||
-        !user_ptr_ok(user_buffer) || count == 0 || count > 512)
+        count == 0 || count > 512 || !user_range_ok(user_buffer, count))
         return -1;
 
     char temp[513];
