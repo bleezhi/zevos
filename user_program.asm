@@ -2,6 +2,7 @@ BITS 64
 section .userprog
 align 16
 global user_program_start
+global user_program_entry
 global user_program_end
 %define USER_BASE 0x400000
 %define ENTRY 0x400078
@@ -31,7 +32,7 @@ user_program_start:
     dq user_program_end - user_program_start
     dq user_program_end - user_program_start
     dq 0x1000
-entry_point:
+user_program_entry:
     mov rdi, 1
     mov rsi, MESSAGE
     mov rdx, 24
@@ -41,7 +42,7 @@ entry_point:
     mov rax, 3
     int 0x80
 .hang:
-    hlt
+    pause
     jmp .hang
 times MESSAGE - USER_BASE - ($ - user_program_start) db 0
 user_message:
