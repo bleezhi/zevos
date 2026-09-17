@@ -4,14 +4,16 @@
 #define SHELL_MAX 128
 static char command[SHELL_MAX]; static unsigned int command_length; static char cwd[64]="/";
 void terminal_putchar(char c); void terminal_puts(const char*s); void terminal_backspace(void); void terminal_clear(void);
+void installer_start(void);
 struct process; extern struct process *process_create_from_path(const char *path); extern void process_launch_user(struct process *process);
 static int string_equals(const char*a,const char*b){while(*a&&*b&&*a==*b){++a;++b;}return *a==0&&*b==0;} static int starts_with(const char*s,const char*p){while(*p){if(*s++!=*p++)return 0;}return 1;} static unsigned int length(const char*s){unsigned int n=0;while(s[n])++n;return n;} static void copy_string(char*d,const char*s,unsigned int m){unsigned int i=0;while(s[i]&&i+1<m){d[i]=s[i];++i;}d[i]=0;}
 static void absolute_path(const char*path,char*out,unsigned int max){if(!path||!*path){copy_string(out,cwd,max);return;}if(path[0]=='/'){copy_string(out,path,max);return;}if(string_equals(cwd,"/")){out[0]='/';copy_string(out+1,path,max-1);}else{copy_string(out,cwd,max);unsigned int n=length(out);if(n+1<max){out[n++]='/';out[n]=0;}copy_string(out+n,path,max-n);}}
 static void prompt(void){terminal_puts("zev@ZevOS:");terminal_puts(cwd);terminal_puts("# ");} static void list_emit(const char*n,int t){terminal_puts(n);if(t==VFS_DIR)terminal_putchar('/');terminal_puts("  ");}
 static void execute_command(void){command[command_length]=0;terminal_putchar('\n');
 if(command_length==0){prompt();}
-else if(string_equals(command,"help")){terminal_puts("Commands:\n  help  clear  echo  pwd  ls  cd  cat  touch  mkdir  rm  cp  mv\n  whoami  id  uname  hostname  true  false  exec /bin/PROGRAM\n  about  ver\n");prompt();}
+else if(string_equals(command,"help")){terminal_puts("Commands:\n  help  clear  echo  pwd  ls  cd  cat  touch  mkdir  rm  cp  mv\n  whoami  id  uname  hostname  true  false  install  exec /bin/PROGRAM\n  about  ver\n");prompt();}
 else if(string_equals(command,"clear")){terminal_clear();prompt();}
+else if(string_equals(command,"install")){installer_start();}
 else if(string_equals(command,"pwd")){terminal_puts(cwd);terminal_putchar('\n');prompt();}
 else if(string_equals(command,"ls")){vfs_list(cwd,list_emit);terminal_putchar('\n');prompt();}
 else if(starts_with(command,"ls ")){char path[128];absolute_path(command+3,path,sizeof(path));if(vfs_list(path,list_emit)!=0)terminal_puts("ls: no such directory\n");else terminal_putchar('\n');prompt();}
