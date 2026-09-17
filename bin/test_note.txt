@@ -1,0 +1,1 @@
+Userspace binary source directory. Real Stage 0 ELF files are installed into /bin at VFS initialization until the HDA filesystem image builder is enabled.
