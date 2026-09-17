@@ -31,6 +31,7 @@ start:
     mov eax, [0x8004]                    ; kernel sector count
     test eax, eax
     jz header_error
+    mov [kernel_sectors], eax
 
     ; Staging area is 0x10000..0xEFFFF (896 KiB).
     ; The current kernel must fit here before it is copied to 1 MiB.
