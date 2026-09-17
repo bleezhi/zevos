@@ -7,9 +7,9 @@ global user_program_end
 
 %define USER_BASE 0x400000
 %define ENTRY 0x400078
-%define MESSAGE 0x400100
-%define PATH    0x400120
-%define BUFFER  0x400140
+%define MESSAGE 0x400140
+%define PATH    0x400160
+%define BUFFER  0x400180
 
 ; First tiny ELF userspace program. It deliberately exercises the complete
 ; bootstrap syscall set before exiting: write, open, read, write, close, exit.
@@ -97,7 +97,7 @@ user_program_entry:
     int 0x80
     jmp .exit_error
 
-; Fixed virtual-address data inside the same mapped PT_LOAD page.
+; Keep fixed virtual-address data inside the same mapped PT_LOAD image.
 times MESSAGE - USER_BASE - ($ - user_program_start) db 0
 user_message:
     db "Hello from ZevOS zinit!", 10
