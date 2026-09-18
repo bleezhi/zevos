@@ -1,8 +1,23 @@
 # ZevBoot
 
-ZevOS is moving away from a GRUB dependency. The boot tree contains the native ZevOS boot protocol and firmware-specific loaders.
+ZevOS no longer depends on GRUB on the nightly branch.
 
-- bios/: native legacy-BIOS boot path
-- uefi/: UEFI application path
+The native boot tree contains two firmware paths:
 
-The existing HDA stage-0 loader is the first native BIOS implementation. The long-term protocol passes a ZevBootInfo structure instead of Multiboot2 state.
+- `bios/` — legacy BIOS ZevBoot stage 1 + stage 2
+- `uefi/` — EDK2 UEFI application
+
+Both loaders hand the kernel a shared `struct zev_boot_info` from `zevboot.h`.
+
+BIOS layout inside the native boot image:
+
+    LBA 0      ZevBoot stage 1
+    LBA 1      ZBOT header
+    LBA 2-17   ZevBoot stage 2
+    LBA 18+    kernel image
+
+The BIOS loader uses E820 to populate the ZevBoot memory map. The UEFI
+loader uses GOP and the UEFI memory map, then calls ExitBootServices().
+
+The kernel has its own 64-bit entry, page tables, TSS setup, and framebuffer
+terminal, so neither path needs Multiboot2 or GRUB state.
