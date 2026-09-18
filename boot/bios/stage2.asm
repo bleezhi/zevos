@@ -12,7 +12,6 @@ ORG 0x8000
 %define E820_COUNT 0x5FFC
 %define HEADER    0x7000
 %define KERNEL_STAGE 0x10000
-%define KERNEL_LBA 18
 %define BOOT_IMAGE_LBA_PTR 0x7BF0
 %define STAGE2_SECTORS 16
 %define MAX_KERNEL_SECTORS 1792
@@ -83,8 +82,10 @@ start:
 .load_kernel:
     mov eax, [kernel_sectors]
     mov [remaining], eax
-    mov eax, [boot_image_lba]
-    add eax, KERNEL_LBA
+    mov eax, [HEADER+12]
+    test eax, eax
+    jz header_error
+    add eax, [boot_image_lba]
     mov [current_lba], eax
     mov dword [stage_lo], KERNEL_STAGE
 
