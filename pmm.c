@@ -1,11 +1,9 @@
-/* ZevOS physical page-frame allocator.
- * Uses the Multiboot2 memory map and 4 KiB pages.
- */
-
+/* ZevOS physical page-frame allocator using ZevBoot's memory map. */
 #include <stdint.h>
+#include "zevboot.h"
 
 #define PAGE_SIZE 4096ULL
-#define MAX_MEMORY (1ULL << 30)
+#define MAX_MEMORY (1ULL << 32)
 #define PAGE_COUNT (MAX_MEMORY / PAGE_SIZE)
 #define BITMAP_SIZE (PAGE_COUNT / 8)
 
@@ -33,7 +31,7 @@ static int is_used(uint64_t page)
     return (page_bitmap[page >> 3] >> (page & 7)) & 1;
 }
 
-void pmm_init(uint32_t multiboot_info)
+void pmm_init(const struct zev_boot_info *boot_info)
 {
     for (unsigned int i = 0; i < BITMAP_SIZE; ++i)
         page_bitmap[i] = 0xFF;
@@ -41,48 +39,53 @@ void pmm_init(uint32_t multiboot_info)
     total_pages = PAGE_COUNT;
     free_pages = 0;
 
-    uint8_t *base = (uint8_t *)(uint64_t)multiboot_info;
-    uint32_t total_size = *(uint32_t *)base;
-    uint32_t offset = 8;
+    if (!boot_info ||
+        boot_info->magic != ZEV_BOOT_MAGIC ||
+        !boot_info->memory_map ||
+        !boot_info->memory_map_entry_size)
+        return;
 
-    while (offset + 8 <= total_size) {
-        uint32_t type = *(uint32_t *)(base + offset);
-        uint32_t size = *(uint32_t *)(base + offset + 4);
-        if (size < 8 || offset + size > total_size)
-            break;
+    uint8_t *base = (uint8_t *)(uint64_t)boot_info->memory_map;
 
-        if (type == 6) {
-            uint64_t entry_size = *(uint32_t *)(base + offset + 8);
-            if (entry_size >= 24) {
-                uint8_t *entry = base + offset + 16;
-                while (entry + entry_size <= base + offset + size) {
-                    uint64_t addr = *(uint64_t *)entry;
-                    uint64_t len = *(uint64_t *)(entry + 8);
-                    uint32_t kind = *(uint32_t *)(entry + 16);
-                    if (kind == 1 && addr < MAX_MEMORY) {
-                        uint64_t end = addr + len;
-                        if (end > MAX_MEMORY) end = MAX_MEMORY;
-                        uint64_t first = (addr + PAGE_SIZE - 1) / PAGE_SIZE;
-                        uint64_t last = end / PAGE_SIZE;
-                        for (uint64_t p = first; p < last; ++p) mark_free(p);
-                    }
-                    entry += entry_size;
-                }
-            }
-        }
+    for (uint64_t i = 0; i < boot_info->memory_map_entries; ++i) {
+        struct zev_memory_map_entry *entry =
+            (struct zev_memory_map_entry *)(base +
+                i * boot_info->memory_map_entry_size);
 
-        offset = (offset + size + 7) & ~7u;
+        if (entry->type != 1 || entry->length == 0)
+            continue;
+
+        uint64_t addr = entry->base;
+        uint64_t end = addr + entry->length;
+        if (end < addr) end = MAX_MEMORY;
+        if (addr >= MAX_MEMORY) continue;
+        if (end > MAX_MEMORY) end = MAX_MEMORY;
+
+        uint64_t first = (addr + PAGE_SIZE - 1) / PAGE_SIZE;
+        uint64_t last = end / PAGE_SIZE;
+        for (uint64_t p = first; p < last; ++p)
+            mark_free(p);
     }
 
-    /* Never hand out pages belonging to the kernel itself. */
+    /* Never allocate pages occupied by the kernel. */
     uint64_t ks = (uint64_t)kernel_start / PAGE_SIZE;
     uint64_t ke = ((uint64_t)kernel_end + PAGE_SIZE - 1) / PAGE_SIZE;
-    for (uint64_t p = ks; p < ke; ++p) mark_used(p);
+    for (uint64_t p = ks; p < ke; ++p)
+        mark_used(p);
 
-    /* Reserve the Multiboot information structure. */
-    uint64_t ms = multiboot_info / PAGE_SIZE;
-    uint64_t me = ((uint64_t)multiboot_info + total_size + PAGE_SIZE - 1) / PAGE_SIZE;
-    for (uint64_t p = ms; p < me; ++p) mark_used(p);
+    /* Keep the ZevBootInfo and its memory map alive. */
+    uint64_t bs = (uint64_t)boot_info / PAGE_SIZE;
+    uint64_t be = bs + 1;
+    for (uint64_t p = bs; p < be; ++p)
+        mark_used(p);
+
+    uint64_t ms = boot_info->memory_map / PAGE_SIZE;
+    uint64_t map_bytes =
+        boot_info->memory_map_entries * boot_info->memory_map_entry_size;
+    uint64_t me = (boot_info->memory_map + map_bytes + PAGE_SIZE - 1) /
+                  PAGE_SIZE;
+    for (uint64_t p = ms; p < me; ++p)
+        mark_used(p);
 
     for (uint64_t p = 0; p < PAGE_COUNT; ++p)
         if (!is_used(p)) ++free_pages;
@@ -105,6 +108,7 @@ void page_free(void *address)
     uint64_t addr = (uint64_t)address;
     if ((addr & (PAGE_SIZE - 1)) != 0 || addr >= MAX_MEMORY)
         return;
+
     uint64_t page = addr / PAGE_SIZE;
     if (is_used(page)) {
         mark_free(page);
@@ -112,12 +116,5 @@ void page_free(void *address)
     }
 }
 
-uint64_t pmm_free_pages(void)
-{
-    return free_pages;
-}
-
-uint64_t pmm_total_pages(void)
-{
-    return total_pages;
-}
+uint64_t pmm_free_pages(void) { return free_pages; }
+uint64_t pmm_total_pages(void) { return total_pages; }
