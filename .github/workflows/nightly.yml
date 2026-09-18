@@ -20,9 +20,15 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc binutils nasm grub-common grub-pc-bin xorriso mtools
+          sudo apt-get install -y gcc binutils nasm xorriso mtools dosfstools uuid-dev acpica-tools python3
 
-      - name: Build ISO
+      - name: Fetch EDK2
+        run: |
+          git clone --depth 1 https://github.com/tianocore/edk2.git edk2
+          cd edk2
+          git submodule update --init --depth 1
+
+      - name: Build native ZevBoot ISO
         run: make
 
       - name: Build bootable HDA image
