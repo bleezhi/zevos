@@ -13,6 +13,7 @@ ORG 0x8000
 %define HEADER    0x7000
 %define KERNEL_STAGE 0x10000
 %define KERNEL_LBA 18
+%define BOOT_IMAGE_LBA_PTR 0x7BF0
 %define STAGE2_SECTORS 16
 %define MAX_KERNEL_SECTORS 1792
 
@@ -25,14 +26,18 @@ start:
     mov sp, 0x7C00
 
     mov [boot_drive], dl
+    mov eax, [BOOT_IMAGE_LBA_PTR]
+    mov [boot_image_lba], eax
 
-    ; Read ZevBoot header from LBA 1.
+    ; Read ZevBoot header from the sector immediately after stage 1.
     mov word [dap.count], 1
     mov word [dap.offset], HEADER
     mov word [dap.segment], 0
     mov dword [dap.buffer_lo], HEADER
     mov dword [dap.buffer_hi], 0
-    mov dword [dap.lba_lo], 1
+    mov eax, [boot_image_lba]
+    add eax, 1
+    mov [dap.lba_lo], eax
     mov dword [dap.lba_hi], 0
     call edd_read
     jc header_error
@@ -81,7 +86,9 @@ start:
     mov [remaining], eax             ; overwritten below; keep assembler happy
     mov eax, [kernel_sectors]
     mov [remaining], eax
-    mov dword [current_lba], KERNEL_LBA
+    mov eax, [boot_image_lba]
+    add eax, KERNEL_LBA
+    mov [current_lba], eax
     mov dword [stage_lo], KERNEL_STAGE
 
 .read_loop:
@@ -203,6 +210,7 @@ print_error:
     jmp .halt
 
 boot_drive db 0
+boot_image_lba dd 0
 kernel_sectors dd 0
 kernel_bytes dd 0
 remaining dd 0
