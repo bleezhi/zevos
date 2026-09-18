@@ -81,7 +81,6 @@ start:
     jmp e820_error
 
 .load_kernel:
-    mov [remaining], eax             ; overwritten below; keep assembler happy
     mov eax, [kernel_sectors]
     mov [remaining], eax
     mov eax, [boot_image_lba]
