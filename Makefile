@@ -15,7 +15,7 @@ UEFI_APP := boot/uefi/ZevBoot.efi
 BIOS_STAGE2_SECTORS := 16
 BIOS_KERNEL_LBA := 18
 
-OBJS := boot.o uefi_entry.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o mainmenu.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o
+OBJS := boot.o uefi_entry.o zevboot_stage1_embed.o zevboot_stage2_embed.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o mainmenu.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o
 
 .PHONY: all clean check iso hda uefi bios
 
@@ -25,6 +25,12 @@ boot.o: boot.asm
 	$(AS) -f elf64 $< -o $@
 
 uefi_entry.o: uefi_entry.asm
+	$(AS) -f elf64 $< -o $@
+
+zevboot_stage1_embed.o: boot/bios/stage1_embed.asm boot/bios/boot.bin
+	$(AS) -f elf64 $< -o $@
+
+zevboot_stage2_embed.o: boot/bios/stage2_embed.asm boot/bios/stage2.bin
 	$(AS) -f elf64 $< -o $@
 
 boot/bios/boot.bin: boot/bios/boot.asm
