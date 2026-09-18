@@ -12,7 +12,7 @@ HDA_IMAGE := zevos-hda.img
 HDA_SIZE_MB := 64
 HDA_KERNEL_LBA := 2
 
-OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o hda_boot_embed.o
+OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o mainmenu.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o hda_boot_embed.o
 
 .PHONY: all clean check iso hda
 
