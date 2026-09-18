@@ -5,7 +5,7 @@ ORG 0x7C00
 
 ; El Torito Boot Info Table is patched by xorriso at offset 8.
 ; Offset 12 contains the LBA of this boot image. For HDA it remains zero.
-times 8-($-$) db 0
+times 8-($-$$) db 0
 boot_info_table:
     dd 0
     dd 0
