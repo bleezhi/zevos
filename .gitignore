@@ -1,4 +1,8 @@
 *.o
 *.elf
 *.iso
+*.img
+*.bin
+Build/
+efi-image/
 iso/
