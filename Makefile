@@ -2,31 +2,38 @@ CC      := gcc
 LD      := ld
 AS      := nasm
 OBJCOPY := objcopy
-GRUB    := grub-file
-RESCUE  := grub-mkrescue
+PYTHON  := python3
+XORRISO := xorriso
 
 CFLAGS  := -ffreestanding -fno-stack-protector -fno-pie -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mcmodel=small -O2 -Wall -Wextra
 LDFLAGS := -T linker.ld -nostdlib -z max-page-size=0x1000
 
 HDA_IMAGE := zevos-hda.img
 HDA_SIZE_MB := 64
-HDA_KERNEL_LBA := 2
+EDK2_DIR ?= edk2
+UEFI_APP := boot/uefi/ZevBoot.efi
+BIOS_STAGE2_SECTORS := 16
+BIOS_KERNEL_LBA := 18
 
-OBJS := boot.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o mainmenu.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o hda_boot_embed.o
+OBJS := boot.o uefi_entry.o interrupts.o interrupts_c.o kernel.o terminal.o terminal_backspace.o keyboard.o shell.o installer.o mainmenu.o vfs.o user_bins.o pmm.o heap.o process.o process_asm.o usermode.o usermode_asm.o user_program.o tss.o vmm.o elf.o fd.o syscall.o syscall_asm.o zinit.o ata.o zevfs.o
 
-.PHONY: all clean check iso hda
+.PHONY: all clean check iso hda uefi bios
 
 all: os.iso
 
 boot.o: boot.asm
 	$(AS) -f elf64 $< -o $@
 
-hda_boot.bin: hda_boot.asm
+uefi_entry.o: uefi_entry.asm
+	$(AS) -f elf64 $< -o $@
+
+boot/bios/boot.bin: boot/bios/boot.asm
 	$(AS) -f bin $< -o $@
 	@test "$$(wc -c < $@)" -eq 512
 
-hda_boot_embed.o: hda_boot_embed.asm hda_boot.bin
-	$(AS) -f elf64 $< -o $@
+boot/bios/stage2.bin: boot/bios/stage2.asm
+	$(AS) -f bin $< -o $@
+	@test "$$(wc -c < $@)" -eq $$(($(BIOS_STAGE2_SECTORS) * 512))
 
 interrupts.o: interrupts.asm
 	$(AS) -f elf64 $< -o $@
@@ -55,31 +62,52 @@ interrupts_c.o: interrupts.c
 kernel.elf: $(OBJS) linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
+kernel.bin: kernel.elf
+	$(OBJCOPY) -O binary $< $@
+
 check: kernel.elf
-	$(GRUB) --is-x86-multiboot2 kernel.elf
-	@echo "Multiboot2 header OK"
+	@echo "ZevOS kernel ELF OK"
+	@file kernel.elf
+
+boot/uefi/ZevBoot.efi: boot/uefi/ZevBoot.dsc boot/uefi/ZevBoot.inf boot/uefi/ZevBoot.c zevboot.h
+	@test -d "$(EDK2_DIR)/BaseTools"
+	@$(MAKE) -C "$(EDK2_DIR)/BaseTools"
+	@cd "$(CURDIR)" && export WORKSPACE="$(CURDIR)" && export PACKAGES_PATH="$(CURDIR)/$(EDK2_DIR)" && export EDK_TOOLS_PATH="$(CURDIR)/$(EDK2_DIR)/BaseTools" && . "$(CURDIR)/$(EDK2_DIR)/edksetup.sh" && build -p boot/uefi/ZevBoot.dsc -a X64 -t GCC5 -b RELEASE
+	@cp Build/ZevBoot/RELEASE_GCC5/X64/ZevBoot.efi $@
+
+uefi: $(UEFI_APP)
+
+zevboot-bios.bin: kernel.bin boot/bios/boot.bin boot/bios/stage2.bin
+	@$(PYTHON) -c "import struct; k=open('kernel.bin','rb').read(); n=(len(k)+511)//512; h=bytearray(512); h[0:4]=b'ZBOT'; h[4:8]=struct.pack('<I',n); h[8:12]=struct.pack('<I',len(k)); h[12:16]=struct.pack('<I',$(BIOS_KERNEL_LBA)); open('zevboot-header.bin','wb').write(h); open('zevboot-kernel.bin','wb').write(k+b'\0'*(n*512-len(k)))"
+	@cat boot/bios/boot.bin zevboot-header.bin boot/bios/stage2.bin zevboot-kernel.bin > $@
+	@rm -f zevboot-header.bin zevboot-kernel.bin
+
+bios: zevboot-bios.bin
+
+efiboot.img: $(UEFI_APP) kernel.elf
+	@rm -f $@
+	@dd if=/dev/zero of=$@ bs=1M count=16 status=none
+	@mkfs.fat -F 16 $@ >/dev/null
+	@mkdir -p .efi-image/EFI/BOOT .efi-image/EFI/ZEVOS
+	@cp $(UEFI_APP) .efi-image/EFI/BOOT/BOOTX64.EFI
+	@cp kernel.elf .efi-image/EFI/ZEVOS/KERNEL.ELF
+	@mcopy -s -i $@ .efi-image/* ::/
+	@rm -rf .efi-image
 
 iso: os.iso
 
-os.iso: kernel.elf grub.cfg
-	$(GRUB) --is-x86-multiboot2 kernel.elf
-	rm -rf iso
-	mkdir -p iso/boot/grub
-	cp kernel.elf iso/boot/kernel.elf
-	cp grub.cfg iso/boot/grub/grub.cfg
-	$(RESCUE) -o $@ iso
+os.iso: kernel.elf zevboot-bios.bin efiboot.img
+	@rm -rf iso
+	@mkdir -p iso
+	@$(XORRISO) -as mkisofs -R -J -V ZEVOS \
+		-b zevboot-bios.bin -no-emul-boot \
+		-eltorito-alt-boot -e efiboot.img -no-emul-boot \
+		-isohybrid-gpt-basdat -o $@ iso
 
-hda: kernel.elf hda_boot.bin
-	$(OBJCOPY) -O binary kernel.elf kernel.bin
-	@sectors=$$(( ($$(wc -c < kernel.bin) + 511) / 512 )); \
-	printf 'ZBOT' > hda_header.bin; \
-	python3 -c "import struct; n=int('$$sectors'); open('hda_header.bin','ab').write(struct.pack('<I', n)); open('hda_header.bin','ab').write(b'\\0'*504)"; \
-	dd if=/dev/zero of=$(HDA_IMAGE) bs=1M count=$(HDA_SIZE_MB) status=none; \
-	dd if=hda_boot.bin of=$(HDA_IMAGE) bs=512 count=1 conv=notrunc status=none; \
-	dd if=hda_header.bin of=$(HDA_IMAGE) bs=512 seek=1 conv=notrunc status=none; \
-	dd if=kernel.bin of=$(HDA_IMAGE) bs=512 seek=$(HDA_KERNEL_LBA) conv=notrunc status=none; \
-	rm -f hda_header.bin kernel.bin; \
-	echo "Created $(HDA_IMAGE) ($$sectors kernel sectors)"
+hda: zevboot-bios.bin
+	@dd if=/dev/zero of=$(HDA_IMAGE) bs=1M count=$(HDA_SIZE_MB) status=none
+	@dd if=zevboot-bios.bin of=$(HDA_IMAGE) bs=512 conv=notrunc status=none
+	@echo "Created $(HDA_IMAGE) using native ZevBoot BIOS"
 
 clean:
-	rm -rf *.o *.elf *.iso *.bin *.img iso
+	rm -rf *.o *.elf *.iso *.bin *.img iso Build .efi-image zevboot-header.bin zevboot-kernel.bin
