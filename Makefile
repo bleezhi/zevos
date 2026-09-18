@@ -107,7 +107,7 @@ os.iso: kernel.elf zevboot-bios.bin efiboot.img
 	@mkdir -p iso
 	@$(XORRISO) -as mkisofs -R -J -V ZEVOS \
 		-b zevboot-bios.bin -no-emul-boot \
-		-eltorito-alt-boot -e efiboot.img -no-emul-boot \
+		-boot-info-table -eltorito-alt-boot -e efiboot.img -no-emul-boot \
 		-isohybrid-gpt-basdat -o $@ iso
 
 hda: zevboot-bios.bin
