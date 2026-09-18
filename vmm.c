@@ -15,11 +15,12 @@ static void zero_page(uint64_t *page){for(unsigned int i=0;i<PAGE_TABLE_ENTRIES;
 static uint64_t *new_table(void){uint64_t *p=(uint64_t*)page_alloc();if(!p)return 0;zero_page(p);return p;}
 static void free_table(uint64_t *p){if(p)page_free(p);}
 static uint64_t *build_identity_space(void){
- uint64_t *pml4=new_table(),*pdpt=new_table(),*pd=new_table();
- if(!pml4||!pdpt||!pd){free_table(pml4);free_table(pdpt);free_table(pd);return 0;}
+ uint64_t *pml4=new_table(),*pdpt=new_table(),*pd[4];
+ if(!pml4||!pdpt){free_table(pml4);free_table(pdpt);return 0;}
+ for(unsigned int n=0;n<4;++n){pd[n]=new_table();if(!pd[n]){for(unsigned int j=0;j<n;++j)free_table(pd[j]);free_table(pdpt);free_table(pml4);return 0;}}
  pml4[0]=(uint64_t)pdpt|PAGE_PRESENT|PAGE_WRITE;
- pdpt[0]=(uint64_t)pd|PAGE_PRESENT|PAGE_WRITE;
- for(unsigned int i=0;i<PAGE_TABLE_ENTRIES;++i)pd[i]=((uint64_t)i<<21)|PAGE_PRESENT|PAGE_WRITE|PAGE_HUGE;
+ for(unsigned int n=0;n<4;++n)pdpt[n]=(uint64_t)pd[n]|PAGE_PRESENT|PAGE_WRITE;
+ for(unsigned int n=0;n<2048;++n){unsigned int t=n/512;unsigned int i=n%512;pd[t][i]=((uint64_t)n<<21)|PAGE_PRESENT|PAGE_WRITE|PAGE_HUGE;}
  return pml4;
 }
 void vmm_init(void){kernel_pml4=build_identity_space();if(kernel_pml4)__asm__ volatile("mov %0,%%cr3"::"r"((uint64_t)kernel_pml4):"memory");}
