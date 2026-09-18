@@ -78,7 +78,7 @@ check: kernel.elf
 boot/uefi/ZevBoot.efi: boot/uefi/ZevBoot.dsc boot/uefi/ZevBoot.inf boot/uefi/ZevBoot.c zevboot.h
 	@test -d "$(EDK2_DIR)/BaseTools"
 	@$(MAKE) -C "$(EDK2_DIR)/BaseTools"
-	@cd "$(CURDIR)" && export WORKSPACE="$(CURDIR)" && export PACKAGES_PATH="$(CURDIR)/$(EDK2_DIR)" && export EDK_TOOLS_PATH="$(CURDIR)/$(EDK2_DIR)/BaseTools" && . "$(CURDIR)/$(EDK2_DIR)/edksetup.sh" && build -p boot/uefi/ZevBoot.dsc -a X64 -t GCC5 -b RELEASE
+	@cd "$(CURDIR)" && export WORKSPACE="$(CURDIR)" && export PACKAGES_PATH="$(CURDIR)/$(EDK2_DIR)" && export EDK_TOOLS_PATH="$(CURDIR)/$(EDK2_DIR)/BaseTools" && . "$(CURDIR)/$(EDK2_DIR)/edksetup.sh" && build -p boot/uefi/ZevBoot.dsc -a X64 -t GCC -b RELEASE
 	@efi="$$(find Build/ZevBoot -type f -name ZevBoot.efi -print -quit)"; test -n "$$efi"; cp "$$efi" $@
 
 uefi: $(UEFI_APP)
