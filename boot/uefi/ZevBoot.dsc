@@ -22,7 +22,6 @@
   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
   DebugLib|MdePkg/Library/BaseDebugLibNull/BaseDebugLibNull.inf
   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
-  SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/SynchronizationLib.inf
 
 [Components]
   boot/uefi/ZevBoot.inf
