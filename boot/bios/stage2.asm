@@ -56,7 +56,7 @@ start:
     ; Collect the BIOS E820 memory map.
     xor ebx, ebx
     mov di, E820_MAP
-    xor bp, bp
+    mov word [E820_COUNT], 0
 .e820:
     mov eax, 0xE820
     mov edx, 0x534D4150
@@ -67,18 +67,16 @@ start:
     jne .done
     cmp ecx, 20
     jb .next
-    mov eax, [di+16]
-    ; E820 type is 32-bit at offset 16. Keep the complete 24-byte entry.
+    ; Keep the complete 24-byte E820 entry.
     add di, 24
-    inc bp
-    cmp bp, 64
+    inc word [E820_COUNT]
+    cmp word [E820_COUNT], 64
     jae .done
 .next:
     test ebx, ebx
     jnz .e820
 .done:
-    mov [E820_COUNT], bp
-    cmp bp, 0
+    cmp word [E820_COUNT], 0
     jne .load_kernel
     jmp e820_error
 
