@@ -6,6 +6,7 @@
   OUTPUT_DIRECTORY                = Build/ZevBoot
   SUPPORTED_ARCHITECTURES        = X64
   BUILD_TARGETS                  = DEBUG|RELEASE
+  SKUID_IDENTIFIER                = DEFAULT
 
 [Packages]
   MdePkg/MdePkg.dec
