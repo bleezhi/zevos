@@ -20,13 +20,51 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc binutils nasm xorriso mtools dosfstools uuid-dev acpica-tools python3
+          sudo apt-get install -y gcc g++ binutils nasm xorriso mtools dosfstools uuid-dev acpica-tools python3 python3-pip
 
       - name: Fetch EDK2
         run: |
           git clone --depth 1 https://github.com/tianocore/edk2.git edk2
           cd edk2
-          git submodule update --init --depth 1
+          git submodule update --init --recursive
+
+      - name: Verify ZevBoot EDK2 inputs
+        run: |
+          test -f boot/uefi/ZevBoot.dsc
+          test -f boot/uefi/ZevBoot.inf
+          test -f boot/uefi/ZevBoot.c
+          test -f edk2/MdePkg/MdePkg.dec
+          test -f edk2/BaseTools/Conf/tools_def.template
+          ! grep -q 'BaseSynchronizationLib/SynchronizationLib.inf' boot/uefi/ZevBoot.dsc
+          ! grep -q '^  SynchronizationLib
+
+      - name: Build bootable HDA image
+        run: make hda
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zevos-nightly-iso
+          path: os.iso
+
+      - name: Upload HDA image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zevos-nightly-hda
+          path: zevos-hda.img
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          TAG="nightly-${{ github.run_number }}"
+          gh release create "$TAG" os.iso zevos-hda.img \
+            --target "$GITHUB_SHA" \
+            --title "ZevOS Nightly $DATE" \
+            --notes "Automated ZevOS nightly build from commit $GITHUB_SHA. Includes the ISO and bootable HDA image." \
+            --prerelease
+ boot/uefi/ZevBoot.inf
 
       - name: Build native ZevBoot ISO
         run: make
