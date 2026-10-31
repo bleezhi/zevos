@@ -1,0 +1,16 @@
+pkgname=zevos-release
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="ZevOS distribution identity and release metadata"
+arch=('any')
+url="https://github.com/bleezhi/zevos"
+license=('MIT')
+source=('os-release' 'issue' 'motd')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+backup=('etc/os-release' 'etc/issue' 'etc/motd')
+
+package() {
+  install -Dm644 "$srcdir/os-release" "$pkgdir/etc/os-release"
+  install -Dm644 "$srcdir/issue" "$pkgdir/etc/issue"
+  install -Dm644 "$srcdir/motd" "$pkgdir/etc/motd"
+}
