@@ -1,63 +1,59 @@
 # ZevOS
 
-A tiny x86_64 hobby operating system built from scratch with C and NASM assembly.
+**ZevOS is an x86_64 Linux distribution project.** The Linux-distro effort is being developed on the `linux-distro` branch. The original freestanding C/NASM hobby kernel remains preserved on `main`, `nightly`, and the historical branches.
+
+## Direction
+
+ZevOS starts as an Arch-compatible binary-package distribution with its own release identity, configuration, installer/live image, and curated package repository. It will use upstream Linux and upstream packages wherever practical instead of maintaining a private fork of the entire Linux ecosystem.
+
+The first milestone is a reproducible, bootable x86_64 base image. A ZevOS-owned package repository and Zev-specific tooling follow once the base image is reliable.
+
+## Initial platform decisions
+
+- Architecture: x86_64
+- Kernel: upstream Linux, initially from the Arch-compatible package ecosystem
+- Package format/manager: pacman-compatible binary packages
+- Base packages: upstream Arch-compatible packages
+- Init: systemd initially; it gives us a complete, supported userspace
+- Boot: UEFI first; BIOS support follows
+- Filesystem: ext4 by default
+- Build target: bootable live/install ISO, tested with QEMU/OVMF
+
+These are initial engineering choices, not permanent constraints.
+
+## Repository layout
+
+- `distro/`: architecture and release policy
+- `packages/`: ZevOS-maintained package recipes
+- `config/`: image and system configuration
+- `scripts/`: build and validation helpers
+- `legacy-kernel/`: reserved for the original freestanding kernel if/when it is moved
+
+The existing hobby-kernel sources are intentionally preserved.
+
+## Build the first ZevOS package
+
+On an Arch Linux build host with `base-devel` installed:
+
+```sh
+cd packages/zevos-release
+makepkg --cleanbuild
+```
+
+Install it only in a disposable test VM:
+
+```sh
+sudo pacman -U ./zevos-release-*.pkg.tar.zst
+```
 
 ## Current status
 
-- GRUB Multiboot2 boot
-- x86_64 long-mode transition
-- Temporary identity-mapped 2 MiB pages
-- 16 KiB kernel stack
-- Freestanding C kernel
-- Direct VGA text-mode output
-- Reproducible ISO build with Make
-- GitHub Actions ISO build artifact
+This branch begins the Linux distribution migration. It is **not yet a bootable ISO** and must not be installed on real hardware.
 
-## Build locally
-
-On Debian/Ubuntu, install:
-
-```sh
-sudo apt install gcc binutils nasm grub-common grub-pc-bin xorriso make
-```
-
-Then run:
-
-```sh
-make
-```
-
-The resulting bootable image is `os.iso`.
-
-To verify the Multiboot2 header without creating the ISO:
-
-```sh
-make check
-```
-
-## Run with QEMU
-
-If QEMU is installed:
-
-```sh
-qemu-system-x86_64 -cdrom os.iso
-```
-
-The kernel should display:
-
-```text
-ZevOS booted successfully!
-```
-
-## Project layout
-
-```text
-boot.asm                 Multiboot2 entry + long-mode setup
-kernel.c                 Freestanding C kernel
-linker.ld                Kernel memory layout
-grub.cfg                 GRUB boot menu
-Makefile                 Local build system
-.github/workflows/       Automated ISO builds
-```
-
-ZevOS is a hobby/learning project and is currently intended for BIOS/GRUB-style booting.
+Milestones:
+1. Build and test the ZevOS release-identity package.
+2. Add a pinned, repeatable base-rootfs build.
+3. Produce a UEFI live ISO with upstream Linux and systemd.
+4. Add an installer with explicit disk selection and destructive-action confirmation.
+5. Publish signed ZevOS packages and repository metadata.
+6. Develop ZevOS-specific tools and desktop components.
