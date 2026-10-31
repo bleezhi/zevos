@@ -4,7 +4,6 @@ pkgrel=1
 pkgdesc="ZevOS distribution identity and release metadata"
 arch=('any')
 url="https://github.com/bleezhi/zevos"
-license=('MIT')
 source=('os-release' 'issue' 'motd')
 sha256sums=('SKIP' 'SKIP' 'SKIP')
 backup=('etc/os-release' 'etc/issue' 'etc/motd')
