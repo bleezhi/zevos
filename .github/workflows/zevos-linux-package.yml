@@ -1,0 +1,38 @@
+name: ZevOS Linux package checks
+
+on:
+  push:
+    branches: [linux-distro]
+    paths:
+      - "packages/**"
+      - ".github/workflows/zevos-linux-package.yml"
+  pull_request:
+    branches: [linux-distro]
+    paths:
+      - "packages/**"
+      - ".github/workflows/zevos-linux-package.yml"
+  workflow_dispatch:
+
+jobs:
+  build-release-package:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Update package database
+        run: pacman -Syu --noconfirm
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build zevos-release
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- bash -lc 'cd "$GITHUB_WORKSPACE/packages/zevos-release" && makepkg --cleanbuild --noconfirm'
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: zevos-release-x86_64
+          path: packages/zevos-release/*.pkg.tar.zst
+          if-no-files-found: error
