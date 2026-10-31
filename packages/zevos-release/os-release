@@ -1,0 +1,9 @@
+NAME="ZevOS"
+PRETTY_NAME="ZevOS Linux"
+ID=zevos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="0;36"
+HOME_URL="https://github.com/bleezhi/zevos"
+BUG_REPORT_URL="https://github.com/bleezhi/zevos/issues"
+SUPPORT_URL="https://github.com/bleezhi/zevos/issues"
